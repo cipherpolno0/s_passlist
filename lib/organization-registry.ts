@@ -1,5 +1,5 @@
 import {gunzipSync,strFromU8} from 'fflate';
-import bundledSeed from '../data/organization-registry-v1.txt?raw';
+import bundledSeed from '../data/organization-registry-v1.json';
 import manifest from '../data/organization-registry-v1.manifest.json';
 export const ORGANIZATION_VERSION=manifest.version;
 export const ORGANIZATION_SOURCE=manifest.source;

@@ -124,7 +124,7 @@ export default function PublicSearch() {
   return <ThaiNumerals><div className="public-shell">
     <header className="public-header">
       <a className="brand" href="/"><span className="brand-symbol"><BookOpen size={27} /></span><span><strong>ธรรมทะเบียน</strong><small>DHAMMA REGISTRY</small></span></a>
-      <div className="public-header-actions"><span className="public-audience-label"><CheckCircle2 size={20} />สืบค้นสำหรับผู้ใช้งานทั่วไป</span><a className="button secondary small" href={viewer?.isAdmin ? '/admin' : '/signin-with-chatgpt?return_to=/admin'} target="_top">{viewer?.isAdmin ? 'จัดการข้อมูล' : 'เข้าสู่ระบบผู้ดูแล'}<ArrowUpRight size={15} /></a></div>
+      <div className="public-header-actions"><span className="public-audience-label"><CheckCircle2 size={20} />สืบค้นสำหรับผู้ใช้งานทั่วไป</span><a className="button secondary small" href={viewer?.isAdmin ? '/admin' : '/login?next=/admin'} target="_top">{viewer?.isAdmin ? 'จัดการข้อมูล' : 'เข้าสู่ระบบผู้ดูแล'}<ArrowUpRight size={15} /></a></div>
     </header>
 
     <main className="public-main">

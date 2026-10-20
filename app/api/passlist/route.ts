@@ -1,11 +1,13 @@
+import {downloadResponse as download,signedDownload} from '../../../lib/platform/download';
+import {uploadedForm,type StagedUpload} from '../../../lib/platform/uploads';
 import {pagination,ADMIN_RECORD_PAGE_SIZES} from '../../../lib/pagination';
 import {applyProvinceRegion} from '../../../lib/province-regions';
 import {certificateNumber} from '../../../lib/certificate-number';
 import {thaiWorkbookCopy} from '../../../lib/thai-workbook';
 import {toThai,toArabic} from '../../../lib/thai-numerals';
 import {findCentralSchool,centralKey} from '../../../lib/central-schools';
-import { env } from 'cloudflare:workers';
-import { getChatGPTUser } from '../../chatgpt-auth';
+import { env } from '../../../lib/platform/runtime';
+import { getCurrentUser } from '../../../lib/auth';
 import {isAdminEmail} from '../../../lib/admin';
 import {commitImport,publishBatch} from '../../../lib/import-service';
 import {publicationErrors,databaseRecord,deferSectRecord} from '../../../lib/classification';
@@ -17,6 +19,8 @@ import {checkOrganizationRecords} from '../../../lib/organization-registry-check
 import {ORGANIZATION_VERSION} from '../../../lib/organization-registry';
 import {activeRecord,trashedRecord} from '../../../lib/record-state';
 export const dynamic='force-dynamic';
+export const runtime='nodejs';
+export const maxDuration=60;
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const db=()=>{if(!env.DB)throw new Error('ยังไม่พร้อมใช้งานฐานข้อมูล');return env.DB;};
 const bucket=()=>{if(!env.BUCKET)throw new Error('ยังไม่พร้อมจัดเก็บไฟล์');return env.BUCKET;};
@@ -28,9 +32,8 @@ function filters(url:URL,owner:string){const w=['r.owner_id=?',"b.status='commit
  const q=(url.searchParams.get('q')||'').trim().slice(0,150);if(q){for(const term of q.split(/\s+/).slice(0,5)){const p='%'+term.replace(/[\\%_]/g,'\\$&')+'%';w.push("(r.first_name LIKE ? ESCAPE '\\' OR r.last_name LIKE ? ESCAPE '\\' OR r.dharma_name LIKE ? ESCAPE '\\' OR r.temple LIKE ? ESCAPE '\\' OR r.school LIKE ? ESCAPE '\\')");args.push(p,p,p,p,p);}}
  return {where:w.join(' AND '),args};}
 const csv=(rows:unknown[][])=>'\ufeff'+rows.map(row=>row.map(v=>{let s=toThai(v??'');if(/^[\s]*[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(',')).join('\r\n');
-const download=(body:BodyInit,name:string,type:string)=>new Response(body,{headers:{'Content-Type':type,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 export async function GET(req:Request){try{
- const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);const owner=user.userId,url=new URL(req.url),action=url.searchParams.get('action')||'search';
+ const user=await getCurrentUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);const owner=user.userId,url=new URL(req.url),action=url.searchParams.get('action')||'search';
  if(action==='template')return download((thaiWorkbookCopy(new Uint8Array(await createTemplate()))).buffer as ArrayBuffer,'passlist-template.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
  if(action==='stats'){
  const stat=await db().prepare(`SELECT COUNT(*) total,COUNT(DISTINCT r.province) provinces,COUNT(DISTINCT r.year) years,SUM(CASE WHEN category='นักธรรม' THEN 1 ELSE 0 END) monastic,SUM(CASE WHEN category='ธรรมศึกษา' THEN 1 ELSE 0 END) lay,COUNT(DISTINCT NULLIF(r.region,'')) regions,SUM(CASE WHEN sect='มหานิกาย' THEN 1 ELSE 0 END) maha,SUM(CASE WHEN sect='ธรรมยุต' THEN 1 ELSE 0 END) dhammayut,SUM(CASE WHEN sect='' THEN 1 ELSE 0 END) unknown_sect FROM records r JOIN batches b ON b.id=r.batch_id WHERE r.owner_id=? AND b.status='committed' AND ${activeRecord('r')}`).bind(owner).first();
@@ -52,7 +55,7 @@ export async function GET(req:Request){try{
  if(action==='preview'||action==='issues'||action==='source'||action==='thai-source'||action==='registry-report'){
  const b=await owned(url.searchParams.get('id')||'',owner);
  if(action==='thai-source'){const f=await bucket().get(`source/${b.id}`);if(!f)throw new Error('ไม่พบต้นฉบับ');const bytes=thaiWorkbookCopy(new Uint8Array(await f.arrayBuffer()));return download(bytes,'เลขไทย-'+toThai(b.filename),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');}
- if(action==='source'){const f=await bucket().get(`source/${b.id}`);if(!f)throw new Error('ไม่พบต้นฉบับ');return download(f.body,String(b.filename),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');}
+ if(action==='source')return signedDownload(`source/${b.id}`,String(b.filename));
  const object=await bucket().get(`preview/${b.id}`);if(!object)throw new Error('ไม่พบข้อมูลตรวจทาน กรุณาอัปโหลดใหม่');const p=await object.json<ParsedFile>();
  for(const r of p.records){r.province??=String(b.province);r.year??=Number(b.year);r.region??='';r.sect??='';r.jurisdiction??='';r.schoolKind??='';}
  const regionRefreshed=p.records.map(r=>{const mapping=applyProvinceRegion(r);if(mapping.filled)r.fingerprint=fingerprint(r);return mapping.changed;}).some(Boolean);
@@ -82,17 +85,18 @@ export async function GET(req:Request){try{
  const {pageSize,pages,page,offset}=pagination(total,url.searchParams,ADMIN_RECORD_PAGE_SIZES);
  const sort=url.searchParams.get('sort'),sequenceSql=[...'๐๑๒๓๔๕๖๗๘๙'].reduce((sql,d,i)=>`REPLACE(${sql},'${d}','${i}')`,'r.sequence');
  const provinceOrder='CASE r.province '+PROVINCES.map((province,index)=>`WHEN '${province}' THEN ${index}`).join(' ')+' ELSE 77 END';
- const sortOrder=`${provinceOrder},CASE r.category WHEN 'นักธรรม' THEN 0 ELSE 1 END,CASE r.level WHEN 'ตรี' THEN 1 WHEN 'โท' THEN 2 ELSE 3 END,r.year DESC,CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,CAST(${sequenceSql} AS REAL) ${sort==='certificate_desc'?'DESC':'ASC'},CASE r.sect WHEN 'มหานิกาย' THEN 0 WHEN 'ธรรมยุต' THEN 1 ELSE 2 END,r.id`;
+ const sortOrder=`${provinceOrder},CASE r.category WHEN 'นักธรรม' THEN 0 ELSE 1 END,CASE r.level WHEN 'ตรี' THEN 1 WHEN 'โท' THEN 2 ELSE 3 END,r.year DESC,CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,passlist_number(${sequenceSql}) ${sort==='certificate_desc'?'DESC':'ASC'},CASE r.sect WHEN 'มหานิกาย' THEN 0 WHEN 'ธรรมยุต' THEN 1 ELSE 2 END,r.id`;
  const result=await db().prepare(`SELECT r.* ${from} ORDER BY ${sortOrder} LIMIT ? OFFSET ?`).bind(...args,pageSize,offset).all();return json({items:result.results,total,page,pages,pageSize});
  }catch(e){console.error(e);return json({error:e instanceof Error?e.message:'เกิดข้อผิดพลาด กรุณาลองใหม่'},400);}}
 export async function POST(req:Request){try{
- // The hosting layer authenticates these headers. Every query also enforces ownership.
- const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);
+ // Supabase verifies the session server-side. Every query also enforces ownership.
+ const user=await getCurrentUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);
  const origin=req.headers.get('origin');if(origin&&origin!==new URL(req.url).origin)return json({error:'ไม่อนุญาตคำขอจากเว็บไซต์อื่น'},403);
  const owner=user.userId;
- if(req.headers.get('content-type')?.includes('multipart/form-data')){
+ const jsonBody=req.headers.get('content-type')?.includes('application/json')?await req.json() as Record<string,unknown>:null;
+ if(req.headers.get('content-type')?.includes('multipart/form-data')||jsonBody?.action==='import-upload'){
  if(Number(req.headers.get('content-length'))>MAX_FILE+65536)throw new Error('ไฟล์ใหญ่เกิน 10 MB');
- const form=await req.formData(),f=form.get('file');if(!(f instanceof File)||!f.name.toLowerCase().endsWith('.xlsx'))throw new Error('รองรับ .xlsx เท่านั้น กรุณาบันทึก .xls เป็น .xlsx ก่อน');
+ const form=jsonBody?.action==='import-upload'?await uploadedForm(jsonBody.upload as StagedUpload,owner):await req.formData(),f=form.get('file');if(!(f instanceof File)||!f.name.toLowerCase().endsWith('.xlsx'))throw new Error('รองรับ .xlsx เท่านั้น กรุณาบันทึก .xls เป็น .xlsx ก่อน');
  if(f.size>MAX_FILE||f.size===0)throw new Error('ขนาดไฟล์ต้องอยู่ระหว่าง 1 ไบต์–10 MB');
  const options:ImportOptions={province:String(form.get('province')||''),year:Number(toArabic(form.get('year'))),category:String(form.get('category')||''),level:String(form.get('level')||''),region:String(form.get('region')||''),sect:String(form.get('sect')||''),useSourceProvince:form.get('useSourceProvince')==='true',jurisdiction:String(form.get('jurisdiction')||''),school:String(form.get('school')||''),filename:f.name,deferSect:form.get('deferSect')==='true'};
  if(options.province)options.province=normalizeProvince(options.province)||options.province;
@@ -118,7 +122,7 @@ export async function POST(req:Request){try{
  if(autoImport&&(options.deferSect?parsed.records.every(r=>!r.errors.length)&&parsed.reconciliation?.matches!==false:parsed.autoReady)){let result;const maxChunks=parsed.records.length>10000?1:Math.ceil(parsed.records.length/400);for(let chunk=0;chunk<maxChunks&&!result?.done;chunk++)result=await commitImport(id,owner,{publish:!options.deferSect,automatic:true,excludeErrors:false,parsed,deferSect:options.deferSect});return json({id,autoCommitted:result?.done??false,autoPending:!result?.done,...result,organizationSummary:parsed.organizationSummary,registrySummary:parsed.registrySummary});}
  return json({id,autoCommitted:false,holds:parsed.holds,autoReady:parsed.autoReady,organizationSummary:parsed.organizationSummary,registrySummary:parsed.registrySummary});
  }
- const body=await req.json() as Record<string,unknown>,action=body.action,id=String(body.id||'');
+ const body=jsonBody||{},action=body.action,id=String(body.id||'');
  if(action==='trash-record'||action==='restore-record'){
  if(body.acknowledge!==true)throw new Error(action==='trash-record'?'กรุณายืนยันการย้ายรายชื่อไปถังขยะ':'กรุณายืนยันการกู้คืนรายชื่อ');
  const expected=action==='trash-record'?activeRecord('r'):trashedRecord('r'),detail={reason:clean(body.reason|| (action==='trash-record'?'ผู้ดูแลย้ายรายชื่อไปถังขยะ':'ผู้ดูแลกู้คืนรายชื่อ'))};
@@ -172,7 +176,7 @@ export async function POST(req:Request){try{
  db().prepare('DELETE FROM batches WHERE id=? AND owner_id=?').bind(id,owner),
  audit(owner,'delete-batch',id,{deletedRecords})
  ]);
- let storageCleaned=true;try{await bucket().delete([`source/${id}`,`preview/${id}`]);}catch(error){storageCleaned=false;console.error('Unable to remove deleted batch files from R2',error);}
+ let storageCleaned=true;try{await bucket().delete([`source/${id}`,`preview/${id}`]);}catch(error){storageCleaned=false;console.error('Unable to remove deleted batch files from private Storage',error);}
  return json({ok:true,deletedRecords,storageCleaned,filename:batch.filename});
  }
  if(action==='commit'){

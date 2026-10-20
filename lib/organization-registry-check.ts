@@ -1,10 +1,11 @@
-import type {D1Database} from '@cloudflare/workers-types';
+import type {Database, ObjectBucket} from './platform/types';
+
 import type {PassRecord,OrganizationMatch,OrganizationSummary} from './constants';
 import {ORGANIZATION_VERSION,ORGANIZATION_ROWS,organizationNameKey} from './organization-registry';
 import {templeAddressKey} from './temple-registry';
 import {fingerprint} from './scope';
 type Candidate={source_row:number;subdistrict:string;district:string;province:string;subdistrict_key:string;district_key:string;province_key:string};
-export async function checkOrganizationRecords(db:D1Database,records:PassRecord[]):Promise<OrganizationSummary>{
+export async function checkOrganizationRecords(db:Database,records:PassRecord[]):Promise<OrganizationSummary>{
  const meta=await db.prepare('SELECT status,seed_offset FROM organization_registry_meta WHERE dataset_version=?').bind(ORGANIZATION_VERSION).first<{status:string;seed_offset:number}>();
  const summary:OrganizationSummary={version:ORGANIZATION_VERSION,ready:meta?.status==='ready'&&Number(meta.seed_offset)===ORGANIZATION_ROWS,total:Number(meta?.seed_offset||0),expected:ORGANIZATION_ROWS,checked:0,matched:0,ambiguous:0,locationMismatch:0,incomplete:0,notFound:0,missingName:0,autoFilledRecords:0,autoFilledSubdistrict:0,autoFilledDistrict:0,autoFilledProvince:0};
  if(!summary.ready)return summary;

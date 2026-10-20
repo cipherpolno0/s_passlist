@@ -177,3 +177,7 @@ td small,.public-school,.truncate{max-width:100%}
 .statistics-results .statistics-table td:last-child small{display:block;font-size:10px;line-height:1.25;margin:2px 0 0;max-width:none}
 .statistics-results .statistics-table tbody tr:hover{background:#fcfdf9}
 .statistics-passed-mismatch{color:var(--danger);font-weight:700}
+
+.auth-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--background,#f7f6f2)}
+.auth-card{width:100%;max-width:440px;background:white;border:1px solid #e2e5e2;border-radius:16px;padding:32px;display:grid;gap:16px}
+.auth-card h1{font-size:1.65rem}.auth-card form,.auth-card label{display:grid;gap:12px}.auth-card form{gap:20px}.auth-card input{width:100%;min-height:46px;border:1px solid #ccd3ce;border-radius:8px;padding:10px;font:inherit}.auth-card a{color:#267153}.profile form button{background:none;border:0;color:inherit;cursor:pointer}

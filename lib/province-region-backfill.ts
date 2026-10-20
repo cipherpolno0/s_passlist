@@ -1,7 +1,8 @@
+import type {Database, ObjectBucket} from './platform/types';
 import {PROVINCE_REGION,PROVINCE_REGION_VERSION,regionForProvince} from './province-regions';
 import {fingerprint} from './scope';
 import {activeRecord} from './record-state';
-export async function backfillProvinceRegions(db:D1Database){
+export async function backfillProvinceRegions(db:Database){
  const version=PROVINCE_REGION_VERSION,token=crypto.randomUUID(),now=Date.now(),deadline=now+18_000;
  const meta=await db.prepare('SELECT status FROM province_region_meta WHERE version=?').bind(version).first();if(meta?.status==='done')return;
  await db.prepare('INSERT OR IGNORE INTO province_region_meta(version,updated_at) VALUES(?,?)').bind(version,new Date().toISOString()).run();

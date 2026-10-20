@@ -20,7 +20,7 @@ export function publicationErrors(r:Pick<PassRecord,'firstName'|'year'|'category
 }
 export function databaseRecord(r:Record<string,unknown>){return {sectReviewed:Number(r.sect_reviewed)===1,firstName:String(r.first_name||''),year:Number(r.year),category:String(r.category||''),level:String(r.level||''),province:String(r.province||''),region:String(r.region||''),sect:String(r.sect||''),school:String(r.school||''),jurisdiction:String(r.jurisdiction||''),schoolKind:String(r.school_kind||'')};}
 
-// Retain the original workbook in R2; ambiguous affiliations stay blank until an admin reviews them.
+// Retain the original workbook in private Storage; ambiguous affiliations stay blank until an admin reviews them.
 export function deferSectRecord(r:PassRecord){
  const sectErrors=r.errors.filter(e=>e.includes('นิกาย')||e.includes('รหัสส่วนกลาง'));
  if(sectErrors.length){r.errors=r.errors.filter(e=>!sectErrors.includes(e));r.warnings.push(...sectErrors.map(e=>'รอตรวจนิกาย: '+e));r.sect='';}

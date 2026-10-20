@@ -1,9 +1,10 @@
+import type {Database, ObjectBucket} from './platform/types';
 import {parseExcel} from './excel';
 import {activeRecord} from './record-state';
 import type {ImportOptions} from './constants';
 
 // Bounded, resumable upgrade of retained source workbooks. Never changes exam or identity fields.
-export async function backfillExamAges(db:D1Database,bucket:R2Bucket){
+export async function backfillExamAges(db:Database,bucket:ObjectBucket){
  const now=Date.now(),token=crypto.randomUUID(),deadline=now+18_000;
  const batch=await db.prepare("SELECT * FROM batches WHERE status IN ('committed','archived') AND age_status IN ('pending','running') AND age_lease_until<? ORDER BY created_at,id LIMIT 1").bind(now).first();
  if(!batch)return;

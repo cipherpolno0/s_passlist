@@ -1,8 +1,10 @@
-import {env} from 'cloudflare:workers';
+import {downloadResponse} from '../../../lib/platform/download';
+import {uploadedForm,type StagedUpload} from '../../../lib/platform/uploads';
+import {env} from '../../../lib/platform/runtime';
 import {backfillRetainedStatistics,statisticsSourceStatus,statisticsQuery} from '../../../lib/statistics-source-service';
 import {STATISTIC_METRICS} from '../../../lib/retained-statistics';
 import {database} from '../../../lib/import-service';
-import {getChatGPTUser} from '../../chatgpt-auth';
+import {getCurrentUser} from '../../../lib/auth';
 import {isAdminEmail} from '../../../lib/admin';
 import {pagination} from '../../../lib/pagination';
 import {parseExamStatistics,statisticsTemplate,statisticsWorkbook} from '../../../lib/exam-statistics';
@@ -11,6 +13,8 @@ import {PROVINCES} from '../../../lib/constants';
 import {activeRecord} from '../../../lib/record-state';
 import {toArabic} from '../../../lib/thai-numerals';
 export const dynamic='force-dynamic';
+export const runtime='nodejs';
+export const maxDuration=60;
 const MAX_FILE=5*1024*1024;
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const now=()=>new Date().toISOString();
@@ -29,9 +33,9 @@ function where(url:URL,owner:string,alias='s'){
  const q=(url.searchParams.get('temple')||'').trim().slice(0,120);if(q){const like='%'+q.replace(/[\\%_]/g,'\\$&')+'%';clauses.push(`${alias}.temple LIKE ? ESCAPE '\\'`);args.push(like);}
  return {sql:clauses.join(' AND '),args,q};
 }
-function xlsx(body:Uint8Array,filename:string){const bytes=Uint8Array.from(body).buffer as ArrayBuffer;return new Response(bytes,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});}
+function xlsx(body:Uint8Array,filename:string){return downloadResponse(Uint8Array.from(body).buffer,filename,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');}
 export async function GET(req:Request){try{
- const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);
+ const user=await getCurrentUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);
  const url=new URL(req.url),action=url.searchParams.get('action')||'list';if(action==='template'){const wb=statisticsTemplate();return xlsx(new Uint8Array(await wb.xlsx.writeBuffer()),'แม่แบบสถิติผลสอบ.xlsx');}
  const db=database(),owner=user.userId;
  if(action==='sources')return json(await statisticsSourceStatus(db,owner));
@@ -64,9 +68,10 @@ export async function GET(req:Request){try{
  return json({items:rows.results,total,page,pages,pageSize,totals,missing,years:await years(),sync:await statisticsSourceStatus(db,owner),conflicts});
  }catch(e){return json({error:e instanceof Error?e.message:'โหลดทะเบียนสถิติไม่สำเร็จ'},400);}}
 export async function POST(req:Request){try{
- const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);const origin=req.headers.get('origin');if(origin&&origin!==new URL(req.url).origin)return json({error:'ไม่อนุญาตคำขอจากเว็บไซต์อื่น'},403);
- if(req.headers.get('content-type')?.includes('application/json')){
-  const body=await req.json() as {action?:string;id?:string},db=database(),owner=user.userId;
+ const user=await getCurrentUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);const origin=req.headers.get('origin');if(origin&&origin!==new URL(req.url).origin)return json({error:'ไม่อนุญาตคำขอจากเว็บไซต์อื่น'},403);
+ const jsonBody=req.headers.get('content-type')?.includes('application/json')?await req.json() as {action?:string;id?:string;upload?:StagedUpload}:null;
+ if(jsonBody&&jsonBody.action!=='import-upload'){
+  const body=jsonBody,db=database(),owner=user.userId;
   if(!['scan-existing','rescan-source'].includes(body.action||''))return json({error:'ไม่รองรับคำขอนี้'},400);
   if(!env.BUCKET)throw new Error('ระบบจัดเก็บไฟล์ยังไม่พร้อม');
   if(body.action==='rescan-source'){
@@ -76,8 +81,8 @@ export async function POST(req:Request){try{
   const result=await backfillRetainedStatistics(db,env.BUCKET,{owner,...(body.action==='rescan-source'?{id:String(body.id)}:{})});
   return json({ok:true,...result,sync:await statisticsSourceStatus(db,owner)});
  }
- if(!req.headers.get('content-type')?.includes('multipart/form-data'))return json({error:'เลือกไฟล์ Excel เพื่ออัปโหลด'},400);if(Number(req.headers.get('content-length'))>MAX_FILE+65536)throw new Error('ไฟล์ใหญ่เกิน ๕ MB');
- const form=await req.formData(),file=form.get('file');if(!(file instanceof File)||!file.name.toLowerCase().endsWith('.xlsx')||file.size<1||file.size>MAX_FILE)throw new Error('เลือกไฟล์ Excel .xlsx ขนาดไม่เกิน ๕ MB');
+ if(!req.headers.get('content-type')?.includes('multipart/form-data')&&jsonBody?.action!=='import-upload')return json({error:'เลือกไฟล์ Excel เพื่ออัปโหลด'},400);if(Number(req.headers.get('content-length'))>MAX_FILE+65536)throw new Error('ไฟล์ใหญ่เกิน ๕ MB');
+ const form=jsonBody?.action==='import-upload'?await uploadedForm(jsonBody.upload||{},user.userId,MAX_FILE):await req.formData(),file=form.get('file');if(!(file instanceof File)||!file.name.toLowerCase().endsWith('.xlsx')||file.size<1||file.size>MAX_FILE)throw new Error('เลือกไฟล์ Excel .xlsx ขนาดไม่เกิน ๕ MB');
  const rawYear=toArabic(String(form.get('year')||'')).trim(),defaultYear=rawYear?Number(rawYear):0;if(rawYear&&(!/^\d{4}$/.test(rawYear)||defaultYear<2400||defaultYear>3000))throw new Error('ปี พ.ศ. เริ่มต้นไม่ถูกต้อง');
  const parsed=parseExamStatistics(new Uint8Array(await file.arrayBuffer()),defaultYear),owner=user.userId,db=database(),stamp=now(),auditId=crypto.randomUUID();
  for(let offset=0;offset<parsed.length;offset+=40){const part=parsed.slice(offset,offset+40),statements=part.map(r=>db.prepare(`INSERT INTO exam_statistics(id,owner_id,year,region,province,category,level,sect,temple,sent,absent,retained,passed,failed,other,note,source_file,source_sheet,source_row,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(owner_id,year,region,province,category,level,sect,temple) DO UPDATE SET sent=excluded.sent,absent=excluded.absent,retained=excluded.retained,passed=excluded.passed,failed=excluded.failed,other=excluded.other,note=excluded.note,source_file=excluded.source_file,source_sheet=excluded.source_sheet,source_row=excluded.source_row,updated_at=excluded.updated_at`).bind(crypto.randomUUID(),owner,r.year,r.region,r.province,r.category,r.level,r.sect,r.temple,r.sent,r.absent,r.retained,r.passed,r.failed,r.other,r.note,file.name.slice(0,250),r.sheet,r.sourceRow,stamp,stamp));await db.batch(statements);}
