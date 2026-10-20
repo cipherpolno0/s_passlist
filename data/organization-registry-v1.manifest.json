@@ -1,0 +1,11 @@
+{
+  "source": "รายชื่อสถานศึกษา_dhammastudy_2569.xlsx",
+  "version": "dhammastudy-organizations-2569-2026-10-20-v1",
+  "sourceSha256": "08108f984a7580127c746d1b1b596352790f84af9eadaceecad0fe20f2f17f6f",
+  "sheet": "รายชื่อสถานศึกษา",
+  "rows": 49519,
+  "provinces": 77,
+  "incompleteAddresses": 0,
+  "duplicateAddressGroups": 583,
+  "duplicateExtraRows": 585
+}

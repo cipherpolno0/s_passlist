@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792456161206,
+      "tag": "0000_greedy_thunderbolts",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792457259884,
+      "tag": "0001_slimy_power_pack",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792458494726,
+      "tag": "0002_flippant_jetstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792461095270,
+      "tag": "0003_left_ozymandias",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792463312446,
+      "tag": "0004_fine_wallflower",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792472089221,
+      "tag": "0005_living_vector",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792474610556,
+      "tag": "0006_complex_solo",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792482220211,
+      "tag": "0007_normal_ultragirl",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792483760046,
+      "tag": "0008_small_johnny_blaze",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792486242676,
+      "tag": "0009_serious_smasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792489975569,
+      "tag": "0010_cool_goliath",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792491880669,
+      "tag": "0011_sweet_strong_guy",
+      "breakpoints": true
+    }
+  ]
+}

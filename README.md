@@ -22,7 +22,8 @@
 - ฐานข้อมูลถาวร D1 (SQLite) และ R2 เก็บต้นฉบับ Excel กับผลตรวจทาน
 - fflate และ fast-xml-parser อ่าน/สร้าง XLSX แบบ synchronous บน server; ใช้ ExcelJS 4.4.0 เฉพาะ workbook model และทดสอบ; Drizzle schema และ migrations
 - ใช้ Sites authentication และ allowlist `ADMIN_EMAILS` ฝั่งเซิร์ฟเวอร์สำหรับ `/admin` และ `/api/passlist`; `/api/public` อ่านเฉพาะ committed + published โดยใช้รายการคอลัมน์ที่อนุญาตเท่านั้น
-- เป็นแอปแยกจาก Supabase / Vercel / GitHub s_passlist เดิม ไม่ได้ย้ายหรือเปลี่ยนระบบเดิม เนื่องจาก Supabase zqdzfugqvmxwoteiptob ปฏิเสธสิทธิ์เข้าถึงในรอบนี้
+- ซอร์สนี้ซิงก์จาก Sites เวอร์ชัน 38 (commit `46b64dea161cd43aff50d3b2079aa24396c1d600`) พร้อมชุดทดสอบที่ปรับหัวคอลัมน์ให้ตรงกับเว็บ ผู้ใช้อนุญาตเผยแพร่ข้อมูลอ้างอิงวัด/สถานศึกษาและข้อมูลสรุปจากไฟล์แนบสู่ GitHub สาธารณะแล้วเมื่อ 20 ตุลาคม 2569 ดูสถานะใน `DEPLOYMENT.md`
+- แอปที่เผยแพร่ปัจจุบันยังใช้ Cloudflare D1/R2 และ ChatGPT sign-in ยังไม่ได้ย้ายฐานข้อมูลไป Supabase หรือเผยแพร่บน Vercel
 - ยังไม่ใช่ PostgreSQL และยังไม่มีระบบมอบสิทธิ์ตามจังหวัด; มี public search API และผู้ดูแลตาม allowlist แล้ว
 - ไม่มีรายชื่อผู้สอบตัวอย่างหรือข้อมูลบุคคลใน source/migration; ฐานข้อมูลผลสอบเริ่มว่าง ส่วนทะเบียนวัดอ้างอิงจากไฟล์ที่ผู้ใช้แนบจะติดตั้งใน D1 เมื่อผู้ดูแลเปิดระบบครั้งแรก
 

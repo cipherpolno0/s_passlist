@@ -1,0 +1,22 @@
+{
+  "source": "Report_Temple.xlsx",
+  "sourceSha256": "67aef90928017f25b9bdd68ceddff89968945fbd52519afe92e350c3fe285a1c",
+  "datasetVersion": "report-temple-2026-10-20-v1",
+  "rows": 44704,
+  "provinces": 77,
+  "sects": {
+    "มหานิกาย": 39723,
+    "ธรรมยุต": 4938,
+    "อนัมนิกาย": 27,
+    "จีนนิกาย": 16
+  },
+  "addressMissing": {
+    "subdistrict": 15,
+    "district": 1,
+    "province": 1
+  },
+  "duplicateGroups": 158,
+  "duplicateExtraRows": 160,
+  "compressedBytes": 882560,
+  "jsonBytes": 7902994
+}

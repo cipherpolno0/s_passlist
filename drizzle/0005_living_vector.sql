@@ -1,0 +1,1 @@
+CREATE INDEX `audit_record_state` ON `audit` (`owner_id`,`target_id`,`created_at`,`id`);
