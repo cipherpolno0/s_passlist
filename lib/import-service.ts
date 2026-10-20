@@ -1,5 +1,5 @@
 import {applyProvinceRegion} from './province-regions';
-import { env } from 'cloudflare:workers';
+import { env } from './platform/runtime';
 import { publicationErrors,databaseRecord,deferSectRecord } from './classification';
 import {fingerprint} from './scope';
 import {SECTS,type ParsedFile} from './constants';

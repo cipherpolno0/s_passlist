@@ -1,7 +1,8 @@
+import type {Database, ObjectBucket} from './platform/types';
 import {parseRetainedStatistics,STATISTICS_PARSER_VERSION,STATISTIC_METRICS} from './retained-statistics';
 import type {ImportOptions} from './constants';
 
-export async function backfillRetainedStatistics(db:D1Database,bucket:R2Bucket,options:{owner?:string;id?:string;background?:boolean}={}){
+export async function backfillRetainedStatistics(db:Database,bucket:ObjectBucket,options:{owner?:string;id?:string;background?:boolean}={}){
  const time=Date.now(),token=crypto.randomUUID(),conditions=["b.status IN ('committed','archived')","COALESCE(s.lease_until,0)<?","(s.batch_id IS NULL OR s.parser_version<>? OR s.status IN ('pending','running'))"],args:unknown[]=[time,STATISTICS_PARSER_VERSION];
  if(options.owner){conditions.push('b.owner_id=?');args.push(options.owner);}
  if(options.id){conditions.push('b.id=?');args.push(options.id);}
@@ -34,7 +35,7 @@ export async function backfillRetainedStatistics(db:D1Database,bucket:R2Bucket,o
  }
 }
 
-export async function statisticsSourceStatus(db:D1Database,owner:string){
+export async function statisticsSourceStatus(db:Database,owner:string){
  const statusCase="CASE WHEN s.parser_version=? THEN s.status ELSE 'pending' END";
  const counts=await db.prepare(`SELECT ${statusCase} status,COUNT(*) count FROM batches b LEFT JOIN statistics_sources s ON s.batch_id=b.id WHERE b.owner_id=? AND b.status IN ('committed','archived') GROUP BY 1`).bind(STATISTICS_PARSER_VERSION,owner).all();
  const states=Object.fromEntries(counts.results.map(r=>[String(r.status),Number(r.count)]));

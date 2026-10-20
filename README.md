@@ -18,14 +18,13 @@
 
 ## เทคโนโลยีและขอบเขต
 
-- React + TypeScript ใช้ Next.js App Router API ผ่าน Vinext บน Sites / Cloudflare Workers
-- ฐานข้อมูลถาวร D1 (SQLite) และ R2 เก็บต้นฉบับ Excel กับผลตรวจทาน
-- fflate และ fast-xml-parser อ่าน/สร้าง XLSX แบบ synchronous บน server; ใช้ ExcelJS 4.4.0 เฉพาะ workbook model และทดสอบ; Drizzle schema และ migrations
-- ใช้ Sites authentication และ allowlist `ADMIN_EMAILS` ฝั่งเซิร์ฟเวอร์สำหรับ `/admin` และ `/api/passlist`; `/api/public` อ่านเฉพาะ committed + published โดยใช้รายการคอลัมน์ที่อนุญาตเท่านั้น
-- ซอร์สนี้ซิงก์จาก Sites เวอร์ชัน 38 (commit `46b64dea161cd43aff50d3b2079aa24396c1d600`) พร้อมชุดทดสอบที่ปรับหัวคอลัมน์ให้ตรงกับเว็บ ผู้ใช้อนุญาตเผยแพร่ข้อมูลอ้างอิงวัด/สถานศึกษาและข้อมูลสรุปจากไฟล์แนบสู่ GitHub สาธารณะแล้วเมื่อ 20 ตุลาคม 2569 ดูสถานะใน `DEPLOYMENT.md`
-- แอปที่เผยแพร่ปัจจุบันยังใช้ Cloudflare D1/R2 และ ChatGPT sign-in ยังไม่ได้ย้ายฐานข้อมูลไป Supabase หรือเผยแพร่บน Vercel
-- ยังไม่ใช่ PostgreSQL และยังไม่มีระบบมอบสิทธิ์ตามจังหวัด; มี public search API และผู้ดูแลตาม allowlist แล้ว
-- ไม่มีรายชื่อผู้สอบตัวอย่างหรือข้อมูลบุคคลใน source/migration; ฐานข้อมูลผลสอบเริ่มว่าง ส่วนทะเบียนวัดอ้างอิงจากไฟล์ที่ผู้ใช้แนบจะติดตั้งใน D1 เมื่อผู้ดูแลเปิดระบบครั้งแรก
+- Next.js 16 + React + TypeScript + Tailwind บน Vercel, Node.js 22.13 ขึ้นไป
+- Supabase PostgreSQL (schema ส่วนตัว `passlist`), Supabase Storage แบบ private และ Supabase Auth แบบ email/password พร้อมลืมรหัสผ่าน
+- คงฟังก์ชัน Sites v38: นำเข้า Excel ตรวจวัด/สถานศึกษา ค้นรายชื่อ สถิติสีแดง เลขไทย และประวัติ/ถังขยะ
+- ผู้ดูแลตรวจจาก session ที่ยืนยันกับ Supabase และ `ADMIN_EMAILS`; ผู้ใช้ทั่วไปไม่ต้องเข้าสู่ระบบ
+- ใช้ `npm ci`, `npm run dev`, `npm run build`, `npm start`; คำแนะนำติดตั้ง migration/env/ย้ายข้อมูลจริงอยู่ใน [DEPLOYMENT.md](DEPLOYMENT.md)
+- เว็บ Sites ต้นทางยังทำงานบน runtime เดิม การเปลี่ยนโค้ดนี้ต้องติดตั้ง Supabase และ deploy Vercel ก่อนใช้งานจริง
+- ฐานข้อมูลใหม่เริ่มว่าง ไม่มีรายชื่อผู้สอบหรือ secret ในซอร์ส; ข้อมูลอ้างอิงวัด/สถานศึกษาเป็นชุดที่ผู้ใช้อนุญาตเผยแพร่แล้ว
 
 ## ความถูกต้องและความปลอดภัย
 
@@ -35,21 +34,16 @@ Import เก็บ draft และ source ก่อน นำเข้ารา
 
 ## พัฒนาและตรวจสอบ
 
-ใช้ Node.js ตาม engines ใน package.json และ pnpm ตาม lockfile
+ใช้ Node.js 22.13 ขึ้นไปและ npm ตาม `package-lock.json` ติดตั้งด้วย `npm ci`
 
-- `pnpm run dev` — preview ตามคู่มือ Sites
-- `pnpm run db:generate` — สร้าง migration จาก db/schema.ts
-- `pnpm exec tsc --noEmit` — ตรวจ TypeScript
-- `node scripts/test-importer.mjs` — ทดสอบ importer
-- `PASSLIST_REFERENCE=/absolute/path/to/2540.xlsx node scripts/test-importer.mjs` — ทดสอบไฟล์ต้นแบบในเครื่องโดยไม่บันทึกข้อมูลเข้าแอป
-- build ตาม Sites workflow แล้ว `node tests/worker-smoke.mjs` — ทดสอบ Worker + D1/R2 จำลองแยก ไม่ใช้ production
+- `npm run dev` — Next.js local development
+- `npm run typecheck` — ตรวจ TypeScript
+- `npm test` — importer, ตารางแสดงผล, retained statistics และ PostgreSQL API integration
+- `npm run build` — Next.js production build
+- `npm run db:migrate` — ติดตั้ง PostgreSQL schema และ private Storage buckets ตาม environment
+- `npm run db:check` — ตรวจ backend จริงหลังตั้งค่าครบ
 
-ทดสอบต้นแบบปี 2540: พบรายชื่อที่ผ่านเกณฑ์ 9,589 แถว ครบ 6 กลุ่ม; แยกอีก 10 แถวที่มีลำดับแต่ไม่มีชื่อ (เช่น หมายเหตุเลขที่ข้าม) เป็น error; เลขลำดับทศนิยม 8 แถวถูกเก็บเป็นคำเตือน ไม่ได้โหลดไฟล์ต้นแบบเข้าฐานข้อมูล production
-
-Worker smoke test ครอบคลุม authentication, isolation ระหว่างผู้ใช้, ติดตั้งทะเบียนวัด 44,704 แถวใน D1, เทียบชื่อ/พื้นที่/นิกาย, upload/preview, import ขัดจังหวะและทำต่อ, atomic visibility, idempotency, search, edit/audit, original download, CSV export, archive/restore และ cross-origin rejection
-
-ไม่มี browser QA ใน environment รอบนี้ เนื่องจากไม่มี control-browser ตาม workflow ของ Sites ตรวจด้วย TypeScript, parser tests, build และ Worker integration tests
-
+ส่วนหัวข้อฟังก์ชันด้านล่างอธิบายพฤติกรรมที่สืบทอดจาก Sites v38 คำว่า D1/R2 หรือ Worker ในบันทึกเดิมหมายถึงแพลตฟอร์มก่อนย้าย ดูวิธีใช้งานปัจจุบันใน DEPLOYMENT.md
 
 ## การอ่านทุกภาค จังหวัด และนิกาย (รุ่น 2)
 

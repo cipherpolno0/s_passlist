@@ -1,4 +1,5 @@
-import type {D1Database} from '@cloudflare/workers-types';
+import type {Database, ObjectBucket} from './platform/types';
+
 import {ORGANIZATION_VERSION,ORGANIZATION_SOURCE,ORGANIZATION_SHA256,ORGANIZATION_ROWS,ORGANIZATION_MANIFEST,getOrganizationSeed,organizationNameKey} from './organization-registry';
 import {templeAddressKey} from './temple-registry';
 import {checkOrganizationRecords,organizationRecordFromDatabase} from './organization-registry-check';
@@ -7,7 +8,7 @@ const now=()=>new Date().toISOString();
 
 // A resumable server upgrade, using only the trusted, bundled reference dataset.
 // A short lease prevents two requests from importing or backfilling the same slice.
-export async function bootstrapOrganizationRegistry(db:D1Database,budgetMs=18000){
+export async function bootstrapOrganizationRegistry(db:Database,budgetMs=18000){
  const started=Date.now(),token=crypto.randomUUID();
  const state=await db.prepare('SELECT backfill_status FROM organization_registry_meta WHERE dataset_version=?').bind(ORGANIZATION_VERSION).first<{backfill_status:string}>();if(state?.backfill_status==='done')return;
  if(!state)await db.prepare(`INSERT OR IGNORE INTO organization_registry_meta(dataset_version,source_filename,source_hash,rows_total,started_at,updated_at) VALUES(?,?,?,?,?,?)`).bind(ORGANIZATION_VERSION,ORGANIZATION_SOURCE,ORGANIZATION_SHA256,ORGANIZATION_ROWS,now(),now()).run();
@@ -41,7 +42,7 @@ export async function bootstrapOrganizationRegistry(db:D1Database,budgetMs=18000
   }
  }finally{await db.prepare("UPDATE organization_registry_meta SET lease_token='',lease_until=0 WHERE dataset_version=? AND lease_token=?").bind(ORGANIZATION_VERSION,token).run();}
 }
-export async function organizationRegistryStatus(db:D1Database){
+export async function organizationRegistryStatus(db:Database){
  const meta=await db.prepare('SELECT * FROM organization_registry_meta WHERE dataset_version=?').bind(ORGANIZATION_VERSION).first();
  const count=Number((await db.prepare('SELECT COUNT(*) count FROM organization_registry WHERE dataset_version=?').bind(ORGANIZATION_VERSION).first<{count:number}>())?.count||0);
  return {source:ORGANIZATION_SOURCE,sourceSha256:ORGANIZATION_SHA256,version:ORGANIZATION_VERSION,expected:ORGANIZATION_ROWS,loaded:count,ready:meta?.status==='ready'&&count===ORGANIZATION_ROWS,provinces:ORGANIZATION_MANIFEST.provinces,duplicateGroups:ORGANIZATION_MANIFEST.duplicateAddressGroups,duplicateExtraRows:ORGANIZATION_MANIFEST.duplicateExtraRows,incompleteAddresses:ORGANIZATION_MANIFEST.incompleteAddresses,backfillStatus:String(meta?.backfill_status||'pending'),scanned:Number(meta?.scanned||0),matched:Number(meta?.matched||0),updated:Number(meta?.updated||0),ambiguous:Number(meta?.ambiguous||0),conflicts:Number(meta?.conflicts||0),notFound:Number(meta?.not_found||0),incomplete:Number(meta?.incomplete||0),importedAt:meta?.imported_at||null,completedAt:meta?.completed_at||null};

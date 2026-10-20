@@ -1,4 +1,5 @@
-import type { D1Database } from '@cloudflare/workers-types';
+import type {Database, ObjectBucket} from './platform/types';
+
 import { SECTS, type PassRecord, type RegistryCheck, type RegistrySummary } from './constants';
 import { normalizeSect, fingerprint } from './scope';
 import { TEMPLE_REGISTRY_ROWS, TEMPLE_REGISTRY_VERSION, templeAddressKey, templeNameKey } from './temple-registry';
@@ -9,7 +10,7 @@ type RegistryCandidate={name:string;sect:string;subdistrict:string;district:stri
 const uniqueSects=(values:string[])=>[...new Set(values.map(v=>v.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));
 const keyOfLocation=(r:RegistryCandidate)=>[r.subdistrict_key,r.district_key,r.province_key].join('|');
 
-export async function checkTempleRecords(database:D1Database,owner:string,records:PassRecord[]):Promise<RegistrySummary>{
+export async function checkTempleRecords(database:Database,owner:string,records:PassRecord[]):Promise<RegistrySummary>{
  const state=await database.prepare("SELECT status,rows_total FROM temple_registry_meta WHERE owner_id=? AND dataset_version=?").bind(owner,TEMPLE_REGISTRY_VERSION).first<{status:string;rows_total:number}>();
  const loaded=Number((await database.prepare('SELECT COUNT(*) count FROM temple_registry WHERE owner_id=? AND dataset_version=?').bind(owner,TEMPLE_REGISTRY_VERSION).first<{count:number}>())?.count||0);
  const ready=state?.status==='ready'&&loaded>=Number(state.rows_total||0);

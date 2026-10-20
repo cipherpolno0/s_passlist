@@ -1,5 +1,5 @@
-import { env } from 'cloudflare:workers';
-import { getChatGPTUser } from '../../chatgpt-auth';
+import { env } from '../../../lib/platform/runtime';
+import { getCurrentUser } from '../../../lib/auth';
 import { isAdminEmail } from '../../../lib/admin';
 import { TEMPLE_REGISTRY_CHUNK, TEMPLE_REGISTRY_ROWS, TEMPLE_REGISTRY_SHA256, TEMPLE_REGISTRY_SOURCE, TEMPLE_REGISTRY_VERSION, getTempleRegistrySeed, templeAddressKey, templeNameKey } from '../../../lib/temple-registry';
 export const dynamic='force-dynamic';
@@ -7,7 +7,7 @@ const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache
 const database=()=>{if(!env.DB)throw new Error('ยังไม่พร้อมใช้งานฐานข้อมูล');return env.DB;};
 const now=()=>new Date().toISOString();
 const audit=(owner:string,action:string,detail:unknown)=>database().prepare('INSERT INTO audit(id,owner_id,action,target_id,detail,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),owner,action,TEMPLE_REGISTRY_VERSION,JSON.stringify(detail),now());
-async function authorized(){const user=await getChatGPTUser();if(!user)throw Object.assign(new Error('กรุณาเข้าสู่ระบบ'),{status:401});if(!isAdminEmail(user.email))throw Object.assign(new Error('เฉพาะผู้ดูแลระบบเท่านั้น'),{status:403});return user;}
+async function authorized(){const user=await getCurrentUser();if(!user)throw Object.assign(new Error('กรุณาเข้าสู่ระบบ'),{status:401});if(!isAdminEmail(user.email))throw Object.assign(new Error('เฉพาะผู้ดูแลระบบเท่านั้น'),{status:403});return user;}
 async function status(owner:string){
  const [meta,count,sects,summary]=await Promise.all([
   database().prepare('SELECT * FROM temple_registry_meta WHERE owner_id=? AND dataset_version=?').bind(owner,TEMPLE_REGISTRY_VERSION).first<Record<string,unknown>>(),

@@ -1,9 +1,10 @@
+import type {Database, ObjectBucket} from './platform/types';
 import {parseExcel} from './excel';
 import {activeRecord} from './record-state';
 import type {ImportOptions} from './constants';
 
 // Read retained workbooks, filling only missing vassa values by original sheet/row identity.
-export async function backfillVassa(db:D1Database,bucket:R2Bucket){
+export async function backfillVassa(db:Database,bucket:ObjectBucket){
  const now=Date.now(),token=crypto.randomUUID(),deadline=now+18_000;
  const batch=await db.prepare("SELECT * FROM batches WHERE status IN ('committed','archived') AND vassa_status IN ('pending','running') AND vassa_lease_until<? ORDER BY created_at,id LIMIT 1").bind(now).first();if(!batch)return;
  const claimed=await db.prepare("UPDATE batches SET vassa_status='running',vassa_lease_token=?,vassa_lease_until=? WHERE id=? AND vassa_status IN ('pending','running') AND vassa_lease_until<?").bind(token,now+120_000,batch.id,now).run();if(!claimed.meta.changes)return;
