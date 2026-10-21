@@ -4,7 +4,7 @@ import {certificateNumber} from '../../../lib/certificate-number';
 import {thaiWorkbookCopy} from '../../../lib/thai-workbook';
 import {toThai,toArabic} from '../../../lib/thai-numerals';
 import {findCentralSchool,centralKey} from '../../../lib/central-schools';
-import { env } from 'cloudflare:workers';
+import { env } from '../../../lib/runtime';
 import { getChatGPTUser } from '../../chatgpt-auth';
 import {isAdminEmail} from '../../../lib/admin';
 import {commitImport,publishBatch} from '../../../lib/import-service';
@@ -82,7 +82,7 @@ export async function GET(req:Request){try{
  const {pageSize,pages,page,offset}=pagination(total,url.searchParams,ADMIN_RECORD_PAGE_SIZES);
  const sort=url.searchParams.get('sort'),sequenceSql=[...'๐๑๒๓๔๕๖๗๘๙'].reduce((sql,d,i)=>`REPLACE(${sql},'${d}','${i}')`,'r.sequence');
  const provinceOrder='CASE r.province '+PROVINCES.map((province,index)=>`WHEN '${province}' THEN ${index}`).join(' ')+' ELSE 77 END';
- const sortOrder=`${provinceOrder},CASE r.category WHEN 'นักธรรม' THEN 0 ELSE 1 END,CASE r.level WHEN 'ตรี' THEN 1 WHEN 'โท' THEN 2 ELSE 3 END,r.year DESC,CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,CAST(${sequenceSql} AS REAL) ${sort==='certificate_desc'?'DESC':'ASC'},CASE r.sect WHEN 'มหานิกาย' THEN 0 WHEN 'ธรรมยุต' THEN 1 ELSE 2 END,r.id`;
+ const sortOrder=`${provinceOrder},CASE r.category WHEN 'นักธรรม' THEN 0 ELSE 1 END,CASE r.level WHEN 'ตรี' THEN 1 WHEN 'โท' THEN 2 ELSE 3 END,r.year DESC,CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,sequence_number(${sequenceSql}) ${sort==='certificate_desc'?'DESC':'ASC'},CASE r.sect WHEN 'มหานิกาย' THEN 0 WHEN 'ธรรมยุต' THEN 1 ELSE 2 END,r.id`;
  const result=await db().prepare(`SELECT r.* ${from} ORDER BY ${sortOrder} LIMIT ? OFFSET ?`).bind(...args,pageSize,offset).all();return json({items:result.results,total,page,pages,pageSize});
  }catch(e){console.error(e);return json({error:e instanceof Error?e.message:'เกิดข้อผิดพลาด กรุณาลองใหม่'},400);}}
 export async function POST(req:Request){try{

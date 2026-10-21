@@ -1,0 +1,49 @@
+import {Pool, types} from 'pg';
+types.setTypeParser(20, Number);
+let pool:Pool|undefined;
+export function postgres(){
+ if(!process.env.DATABASE_URL)throw new Error('ยังไม่ได้ตั้งค่าฐานข้อมูล');
+ return pool??=new Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:true},max:5,idleTimeoutMillis:30000,connectionTimeoutMillis:15000});
+}
+const numeric=new Set('year source_row source_order source_end_row sent absent retained passed failed other birth_year age_at_exam birth_year_estimated age_estimated vassa sect_reviewed lease_until row order birth age birthEstimated ageEstimated'.split(' '));
+export function postgresSql(input:string){
+ let sql=input.replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi,'INSERT INTO');
+ const ignore=/INSERT\s+OR\s+IGNORE\s+INTO/i.test(input);
+ sql=sql.replace(/lower\(hex\(randomblob\(16\)\)\)/gi,"replace(gen_random_uuid()::text,'-','')")
+  .replace(/json_extract\(([^(),]+),\s*'\$\.([^']+)'\)/g,(all,_v,field)=>numeric.has(field)?`(${all})::bigint`:all)
+  .replace(/\bjson_array\(/gi,'jsonb_build_array(').replace(/\bjson_object\(/gi,'jsonb_build_object(');
+ let out='',quote='',index=0;const stack:string[]=[];
+ for(let i=0;i<sql.length;i++){
+  const c=sql[i];
+  if(quote){out+=c;if(c===quote){if(sql[i+1]===quote){out+=sql[++i];}else quote='';}continue;}
+  if(c==="'"||c==='"'){quote=c;out+=c;continue;}
+  if(c==='('){stack.push((out.match(/([a-z_]+)\s*$/i)?.[1]||'').toLowerCase());out+=c;continue;}
+  if(c===')'){stack.pop();out+=c;continue;}
+  if(c==='?'){out+=`$${++index}`+(stack.includes('jsonb_build_object')?'::text':'');continue;}
+  out+=c;
+ }
+ if(ignore)out=out.replace(/;?\s*$/,' ON CONFLICT DO NOTHING');
+ return out;
+}
+export class PgStatement {
+ constructor(readonly sql:string,readonly args:unknown[]=[]){ }
+ bind(...args:unknown[]){return new PgStatement(this.sql,args);}
+ async all<T=Record<string,unknown>>(){return database.batch([this]).then(rows=>rows[0] as {results:T[];meta:{changes:number}});}
+ async run(){return this.all();}
+ async first<T=Record<string,unknown>>(column?:string){const row=(await this.all<T>()).results[0];return row?(column?(row as Record<string,unknown>)[column]:row):null;}
+}
+export const database={
+ prepare(sql:string){return new PgStatement(sql);},
+ async batch(statements:PgStatement[]){
+  const client=await postgres().connect();
+  try{await client.query('BEGIN');await client.query('SET LOCAL search_path = passlist, pg_catalog');await client.query("SET LOCAL statement_timeout = '120s'");
+   const results=[];for(const statement of statements){const r=await client.query(postgresSql(statement.sql),statement.args);results.push({results:r.rows,success:true,meta:{changes:r.rowCount||0}});}
+   await client.query('COMMIT');return results;
+  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+ }
+};
+export const bucket={
+ async get(key:string){const r=await postgres().query('SELECT content FROM passlist.source_files WHERE key=$1',[key]);if(!r.rows.length)return null;const bytes=r.rows[0].content as Buffer;return {body:new Uint8Array(bytes),arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),text:async()=>bytes.toString('utf8'),json:async<T>()=>JSON.parse(bytes.toString('utf8')) as T};},
+ async put(key:string,value:BodyInit,options?:{httpMetadata?:{contentType?:string}}){const bytes=Buffer.from(await new Response(value).arrayBuffer());await postgres().query('INSERT INTO passlist.source_files(key,content,content_type) VALUES($1,$2,$3) ON CONFLICT(key) DO UPDATE SET content=excluded.content,content_type=excluded.content_type',[key,bytes,options?.httpMetadata?.contentType||'application/octet-stream']);return {key};},
+ async delete(keys:string|string[]){await postgres().query('DELETE FROM passlist.source_files WHERE key=ANY($1::text[])',[Array.isArray(keys)?keys:[keys]]);}
+};

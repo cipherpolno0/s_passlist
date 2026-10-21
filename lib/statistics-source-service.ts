@@ -52,8 +52,8 @@ export function statisticsQuery(owner:string,filter:{sql:string;args:unknown[]})
  SELECT r.* FROM retained_exam_statistics r JOIN batches b ON b.id=r.batch_id JOIN statistics_sources m ON m.batch_id=b.id
  WHERE r.owner_id=? AND b.owner_id=r.owner_id AND b.status='committed' AND m.parser_version=? AND m.status='done'
  ), grouped_auto AS (
- SELECT ${scope.join(',')},${STATISTIC_METRICS.map(m=>`MAX(${m}) ${m}`).join(',')},GROUP_CONCAT(DISTINCT note) note,
- GROUP_CONCAT(DISTINCT source_file||' / '||source_sheet||' แถว '||source_row) source_file,COUNT(*) source_rows,
+ SELECT ${scope.join(',')},${STATISTIC_METRICS.map(m=>`MAX(${m}) ${m}`).join(',')},STRING_AGG(DISTINCT note,',') note,
+ STRING_AGG(DISTINCT source_file||' / '||source_sheet||' แถว '||source_row,',') source_file,COUNT(*) source_rows,
  COUNT(DISTINCT json_array(${metrics})) variants FROM raw_auto GROUP BY ${scope.join(',')}
  ), candidates AS (
  SELECT ${scope.join(',')},${metrics},note,source_file,1 source_rows,'manual' origin FROM exam_statistics WHERE owner_id=?

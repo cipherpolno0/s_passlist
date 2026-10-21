@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env} from '../../../lib/runtime';
 import {backfillRetainedStatistics,statisticsSourceStatus,statisticsQuery} from '../../../lib/statistics-source-service';
 import {STATISTIC_METRICS} from '../../../lib/retained-statistics';
 import {database} from '../../../lib/import-service';

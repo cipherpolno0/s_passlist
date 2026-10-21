@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import { env } from '../../../lib/runtime';
 import { getChatGPTUser } from '../../chatgpt-auth';
 import { isAdminEmail } from '../../../lib/admin';
 import { TEMPLE_REGISTRY_CHUNK, TEMPLE_REGISTRY_ROWS, TEMPLE_REGISTRY_SHA256, TEMPLE_REGISTRY_SOURCE, TEMPLE_REGISTRY_VERSION, getTempleRegistrySeed, templeAddressKey, templeNameKey } from '../../../lib/temple-registry';

@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env} from '../../../lib/runtime';
 import {getChatGPTUser} from '../../chatgpt-auth';
 import {isAdminEmail} from '../../../lib/admin';
 import {bootstrapOrganizationRegistry,organizationRegistryStatus} from '../../../lib/organization-registry-bootstrap';

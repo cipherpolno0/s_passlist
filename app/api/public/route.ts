@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
   const db = database();
   const arabic=(column:string)=>[...'๐๑๒๓๔๕๖๗๘๙'].reduce((sql,digit,index)=>`REPLACE(${sql},'${digit}','${index}')`,column);
-  const sequenceOrder=`CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,CAST(${arabic('r.sequence')} AS REAL)`;
+  const sequenceOrder=`CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,sequence_number(${arabic('r.sequence')})`;
   const order = `${provinceOrder},CASE r.category WHEN 'นักธรรม' THEN 0 ELSE 1 END,CASE r.level WHEN 'ตรี' THEN 1 WHEN 'โท' THEN 2 ELSE 3 END,r.year DESC,${sequenceOrder} ASC,CASE r.sect WHEN 'มหานิกาย' THEN 0 WHEN 'ธรรมยุต' THEN 1 ELSE 2 END,r.id`;
   const from = `FROM records r JOIN batches b ON b.id=r.batch_id WHERE b.status='committed' AND b.visibility='published' AND ${activeRecord('r')} AND (LOWER(TRIM(${arabic("r.first_name")}))LIKE LOWER(?) ESCAPE '\\' OR LOWER(TRIM(${arabic("COALESCE(r.title,'')||r.first_name")}))LIKE LOWER(?) ESCAPE '\\' OR LOWER(TRIM(${arabic("COALESCE(r.title,'')||' '||r.first_name")}))LIKE LOWER(?) ESCAPE '\\') AND LOWER(TRIM(${arabic("r.last_name")}))LIKE LOWER(?) ESCAPE '\\'`;
   // Both name fields remain mandatory. Escape LIKE syntax so literal one-letter and partial-name searches cannot turn into wildcard browsing.

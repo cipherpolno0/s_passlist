@@ -1,43 +1,53 @@
-# การเชื่อมต่อและเผยแพร่ s_passlist
+# เผยแพร่ s_passlist บน Vercel และ Supabase
 
-สถานะตรวจสอบ 20 ตุลาคม 2569
+เป้าหมายเดียวของชุดนี้คือ GitHub `cipherpolno0/s_passlist`, Supabase `ywtewiwhwurvuslarmme` และ Vercel `kungrobcipher-8723/news_passlist` เว็บไซต์เดิมที่ Sites ยังทำงานอยู่และยังไม่ถูกสลับโฮสต์
 
-## เว็บและซอร์สโค้ด
+## Runtime และข้อมูล
 
-- เว็บปัจจุบัน: https://s-passlist.kungrobcipher.chatgpt.site/ เวอร์ชัน 38
-- ซอร์สต้นทาง: `46b64dea161cd43aff50d3b2079aa24396c1d600`
-- GitHub: https://github.com/cipherpolno0/s_passlist บัญชี `cipherpolno0` มีสิทธิ์เขียนและดูแล repository
-- ผู้ใช้อนุญาตเผยแพร่ข้อมูลอ้างอิงวัด/สถานศึกษาและข้อมูลสรุปจากไฟล์แนบใน repository สาธารณะนี้ เมื่อ 20 ตุลาคม 2569 เวลา 19:34 น. (ประเทศไทย) ซอร์สเต็มจาก Sites เวอร์ชัน 38 พร้อมผลตรวจสอบอยู่ในชุด commit นี้
-- ซอร์สชุดนี้มีหน้าเว็บ API ไลบรารี scripts ทะเบียนอ้างอิง และ SQLite migrations ครบ ไม่รวมไฟล์ environment, token, ฐานข้อมูลผลสอบ หรือไฟล์ Excel ของผู้ใช้งาน
-- ช่อง “สอบได้” เป็นสีแดงเมื่อสถิติไม่เท่ากับจำนวนรายชื่อที่ยังใช้งานอยู่ในชุดข้อมูลนำเข้าสำเร็จ โดยเทียบปี จังหวัด ประเภท ชั้น และนิกาย/สังกัดเมื่อระบุ
+ใช้ Next.js App Router, React, TypeScript และ Tailwind บน Node.js 24 กับ pnpm ตาม package.json ฐานข้อมูลเป็น PostgreSQL schema `passlist` ผ่าน `pg` และ transaction pooler; ใช้ Supabase Auth กับ SSR cookies ยืนยันตัวตนด้วย `getUser()` และอีเมลที่ยืนยันแล้ว พร้อมตรวจ `ADMIN_EMAILS` ฝั่งเซิร์ฟเวอร์
 
-## ข้อกำหนด runtime ปัจจุบัน
+ตาราง 12 ตารางเปิด RLS และถอนสิทธิ์ PUBLIC/anon/authenticated ไม่เปิด schema นี้ใน Data API ใช้ role `passlist_app` ซึ่งมีสิทธิ์อ่าน/เขียนเฉพาะ schema นี้และไม่มี BYPASSRLS; API เซิร์ฟเวอร์ตรวจสิทธิ์ผู้ดูแล/เจ้าของและสถานะเผยแพร่ก่อนอ่านข้อมูล
 
-เว็บใช้ Vinext บน Cloudflare Workers, D1 binding `DB`, R2 binding `BUCKET` และ Sites authentication โดยกำหนดผู้ดูแลด้วย `ADMIN_EMAILS` ฝั่งเซิร์ฟเวอร์
+ไฟล์ Excel และ preview เก็บใน `passlist.source_files` แบบ bytea ส่วนตัว ไม่ใช้ Supabase Storage ในชุดนี้ ห้ามนำ schema จาก PR #1 ซึ่งใช้ Storage มารวมโดยไม่ปรับความเข้ากันได้
 
-ใช้ Node.js 22.13 ขึ้นไปและ pnpm ตามเวอร์ชันใน `package.json`; ติดตั้งด้วย `npm run install:ci` และ build ด้วย `npm run build` ต้องกำหนด D1/R2 และระบบยืนยันตัวตนจริงจึงจะให้บริการ API ได้ การ build สำเร็จเพียงอย่างเดียวไม่ได้แปลว่าได้เชื่อมฐานข้อมูล production แล้ว
+## สถานะที่ตรวจ 21 ตุลาคม 2569
 
-ห้ามนำโค้ดรับ header `oai-authenticated-user-*` ไปเชื่อถือบนโฮสต์ทั่วไปโดยไม่มี trusted authentication proxy ของ Sites เพราะผู้เรียกอาจปลอม header ได้
+- Sites เวอร์ชัน 38 มีชุดข้อมูล committed/published 2 ชุด จำนวน 13,960 และ 10,540 รวม 24,500 รายชื่อ
+- Supabase มี schema 12 ตารางแต่ยังไม่มีข้อมูลหรือบัญชี Auth
+- Vercel เข้าถึงโปรเจกต์ได้แล้ว มี URL/publishable key สาธารณะ แต่ยังขาด DATABASE_URL, ADMIN_EMAILS และ DATA_OWNER_ID
+- Deployment เดิมผิดพลาด NEXT_NO_ROUTES_MANIFEST เพราะ main ยัง build ด้วย Vinext การเปลี่ยนเป็น `next build` ในชุดนี้แก้สาเหตุที่ระดับซอร์ส ยังต้องทดสอบ deployment จริง
+- การสร้าง application/export credentials และการส่ง administrator email/source owner ID ไป Vercel เคยถูก automatic approval review ปฏิเสธ ต้องมีการอนุญาตที่ระบุข้อมูลและปลายทางก่อนดำเนินการเหล่านี้
 
-## Vercel และ Supabase
+## หลังได้การอนุญาตที่จำเป็น
 
-- Vercel ทีมเป้าหมาย `kungrobcipher-8723`: การเชื่อมต่อปัจจุบันตอบกลับ HTTP 403 ไม่อนุญาตเข้าถึงทีม จึงยังตรวจหรือสร้างโปรเจกต์ `s_passlist` ไม่ได้
-- Supabase โปรเจกต์ `zqdzfugqvmxwoteiptob`: การเชื่อมต่อปัจจุบันตอบกลับว่าไม่มีสิทธิ์ดำเนินการ จึงยังไม่รัน migration หรือเปลี่ยนแปลงข้อมูลในโปรเจกต์นี้
-- ไม่ใช้โปรเจกต์ Supabase หรือทีม Vercel อื่นแทนเป้าหมายที่ผู้ใช้ระบุ
+1. ตรวจว่า schema ตรง `supabase/schema.sql` ที่ติดตั้งไว้แล้ว ห้ามรันไฟล์นี้ซ้ำบนปลายทางที่มี schema เพราะใช้ CREATE TABLE/FUNCTION
+2. สร้าง role ตาม `supabase/app-role.sql` ผ่าน psql protected stdin โดยส่ง `app_password` เป็นรหัสสุ่ม ไม่บันทึกรหัสใน repository หรือประวัติ SQL สาธารณะ สคริปต์ role ทำใน transaction และหยุดเมื่อ role มีอยู่แล้ว
+3. ตั้ง env ใน Vercel production: DATABASE_URL ของ transaction pooler (port 6543, username `passlist_app.<project-ref>`), NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, ADMIN_EMAILS และ DATA_OWNER_ID ซึ่งตรงเจ้าของข้อมูล Sites เดิม ห้ามใช้ project postgres/service-role เป็น runtime credential
+4. สร้างบัญชี Supabase Auth ของอีเมลผู้ดูแลที่อนุญาตและยืนยันอีเมล ตั้ง Site URL ให้ตรงโดเมนจริง หน้า /login มีการสร้างบัญชีเฉพาะ allowlist; ยังไม่มี flow ลืมรหัสผ่านในชุดนี้
+5. ตั้ง Vercel Framework เป็น Next.js, Build Command `pnpm build`, Install Command `pnpm install --frozen-lockfile`, ไม่กำหนด Output Directory เป็น dist และใช้ Node.js 24
+6. เก็บ DATABASE_URL เฉพาะ encrypted/sensitive environment ฝั่งเซิร์ฟเวอร์ ไม่ส่งรหัสฐานข้อมูลไป NEXT_PUBLIC_ และไม่ใส่ credentials ของ production ให้ preview ที่ยังไม่ตรวจโค้ด
 
-การย้ายไป Vercel + Supabase ต้องปรับ runtime, SQL/transaction, การเก็บไฟล์ และ authentication ก่อน: เปลี่ยน `cloudflare:workers` กับ D1 เป็น PostgreSQL/Supabase; แปลง SQLite migrations; ย้าย R2 เป็น storage ที่เข้าถึงจาก Vercel; เปลี่ยน Sites sign-in เป็น session ที่ตรวจสอบได้บน Vercel; ตรวจ RLS, สิทธิ์ผู้ดูแล, import/export, การคำนวณสถิติ และการกู้ข้อมูลก่อนสลับเว็บ production
+## ย้ายข้อมูลจริง
 
-โค้ดปัจจุบันยังไม่พร้อม deploy ตรงบน Vercel ด้วย `next build` และยังไม่มี PostgreSQL migration ที่ผ่านการทดสอบ อย่านำ SQLite migrations ใน `drizzle/` ไปรันบน Supabase โดยตรง
+หยุดแก้ไขและนำเข้าข้อมูลที่เว็บต้นทางตลอดการย้าย คงเว็บต้นทางไว้จนกว่าการตรวจจะเสร็จ
 
-## ตรวจสอบซอร์ส
+1. เปิด read-only route ชั่วคราวจาก `tools/sites-export-route.ts` เฉพาะ Sites ต้นทาง สุ่ม export token และเก็บเฉพาะ SHA-256 กับวันหมดอายุใน MIGRATION_EXPORT_TOKEN_SHA256/MIGRATION_EXPORT_EXPIRES ตัว route ปิดเมื่อคีย์หมดอายุ
+2. เรียก `node tools/migrate-site.mjs --apply` ใน environment ที่ป้องกัน โดยตั้ง SOURCE_SITE_URL, SOURCE_EXPORT_TOKEN, DATABASE_URL และ SOURCE_READ_ONLY_CONFIRMED=true
+3. สคริปต์ล็อกตารางปลายทางและใช้ transaction เดียว หยุดหากมีแถวในตารางใด ตรวจจำนวนทุกตาราง อ่านข้อมูลต้นทางซ้ำเพื่อเทียบ digest และตรวจ SHA-256 ไฟล์ source/preview ทั้งในปลายทางและต้นทางก่อน COMMIT หากเกิดข้อผิดพลาดจะ ROLLBACK ทั้งหมด
+4. ถ้าสคริปต์ขาดการเชื่อมต่อช่วง COMMIT ให้ตรวจจำนวนและไฟล์ก่อน retry; หากมีข้อมูลแล้วสคริปต์จะหยุดเพื่อป้องกันเขียนทับ
+5. ถอน export route และ environment ชั่วคราวทันทีหลังย้าย ตรวจว่าปลายทางเก่าตอบ 404
+6. ตรวจ public search, ตัวกรองทั้ง 6 ชั้น, สถิติสีแดงเมื่อไม่ตรงรายชื่อ, login/logout, การปฏิเสธผู้ไม่มีสิทธิ์, import/export, ถังขยะ/กู้คืนและทะเบียนด้วยข้อมูลจริง ก่อนสลับ production
+
+ห้ามนำไฟล์ Excel รายชื่อ ผลส่งออก database หรือ secrets ขึ้น GitHub ข้อมูลอ้างอิงวัด/สถานศึกษาที่ได้รับอนุญาตไว้แล้วเป็นคนละชุดกับรายชื่อผู้สอบได้
+
+## ตรวจซอร์สโดยไม่แก้ข้อมูลจริง
 
 ```sh
-node node_modules/typescript/bin/tsc --noEmit
-node scripts/test-importer.mjs
-node scripts/test-results-display.mjs
-node scripts/test-retained-statistics.mjs
-npm run build
-node tests/statistics-source-smoke.mjs
+pnpm install --frozen-lockfile
+pnpm test
+pnpm typecheck
+pnpm build
+node --experimental-transform-types tools/check-postgres-queries.mjs
 ```
 
-Smoke test ใช้ D1/R2 จำลองแยกจากข้อมูลจริง ต้อง build ก่อนรัน
+คำสั่งสุดท้ายสร้าง SQL ด้วยข้อมูลสมมติใน .sites-runtime ให้ตรวจบน PostgreSQL ภายใน transaction ที่ ROLLBACK ไม่มีคำสั่งนำเข้าข้อมูลจริง การ build/test ผ่านยังไม่ยืนยันว่า credentials, Auth หรือ production พร้อมแล้ว
