@@ -1,4 +1,5 @@
 import {Pool, types} from 'pg';
+import {context} from './audit-store.mjs';
 types.setTypeParser(20, Number);
 let pool:Pool|undefined;
 export function postgres(){
@@ -37,13 +38,15 @@ export const database={
  async batch(statements:PgStatement[]){
   const client=await postgres().connect();
   try{await client.query('BEGIN');await client.query('SET LOCAL search_path = passlist, pg_catalog');await client.query("SET LOCAL statement_timeout = '120s'");
+   const c=context.getStore();await client.query("SELECT set_config('passlist.audit_context',$1,true)",[JSON.stringify(c?{request_id:c.requestId,actor_id:c.actorId,actor_email:c.actorEmail,actor_role:c.actorRole,owner_id:c.ownerId,path:c.path,method:c.method,action:c.action,ip:c.ip,user_agent:c.userAgent}:{actor_role:'system',action:'background'})]);
+   if(c?.access?.role==='viewer'&&statements.some(s=>/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(s.sql)))throw new Error('บทบาทผู้ดูข้อมูลไม่สามารถเปลี่ยนข้อมูลได้');
    const results=[];for(const statement of statements){const r=await client.query(postgresSql(statement.sql),statement.args);results.push({results:r.rows,success:true,meta:{changes:r.rowCount||0}});}
    await client.query('COMMIT');return results;
   }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  }
 };
 export const bucket={
- async get(key:string){const r=await postgres().query('SELECT content FROM passlist.source_files WHERE key=$1',[key]);if(!r.rows.length)return null;const bytes=r.rows[0].content as Buffer;return {body:new Uint8Array(bytes),arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),text:async()=>bytes.toString('utf8'),json:async<T>()=>JSON.parse(bytes.toString('utf8')) as T};},
- async put(key:string,value:BodyInit,options?:{httpMetadata?:{contentType?:string}}){const bytes=Buffer.from(await new Response(value).arrayBuffer());await postgres().query('INSERT INTO passlist.source_files(key,content,content_type) VALUES($1,$2,$3) ON CONFLICT(key) DO UPDATE SET content=excluded.content,content_type=excluded.content_type',[key,bytes,options?.httpMetadata?.contentType||'application/octet-stream']);return {key};},
- async delete(keys:string|string[]){await postgres().query('DELETE FROM passlist.source_files WHERE key=ANY($1::text[])',[Array.isArray(keys)?keys:[keys]]);}
+ async get(key:string){const r=await database.prepare('SELECT content FROM source_files WHERE key=?').bind(key).all();if(!r.results.length)return null;const bytes=r.results[0].content as Buffer;return {body:new Uint8Array(bytes),arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),text:async()=>bytes.toString('utf8'),json:async<T>()=>JSON.parse(bytes.toString('utf8')) as T};},
+ async put(key:string,value:BodyInit,options?:{httpMetadata?:{contentType?:string}}){const bytes=Buffer.from(await new Response(value).arrayBuffer());await database.prepare('INSERT INTO source_files(key,content,content_type) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET content=excluded.content,content_type=excluded.content_type').bind(key,bytes,options?.httpMetadata?.contentType||'application/octet-stream').run();return {key};},
+ async delete(keys:string|string[]){await database.prepare('DELETE FROM source_files WHERE key=ANY(?::text[])').bind(Array.isArray(keys)?keys:[keys]).run();}
 };

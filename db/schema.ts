@@ -38,3 +38,14 @@ export const statisticsSources=sqliteTable('statistics_sources',{
 export const retainedExamStatistics=sqliteTable('retained_exam_statistics',{
  id:text('id').primaryKey(),batchId:text('batch_id').notNull().references(()=>batches.id,{onDelete:'cascade'}),ownerId:text('owner_id').notNull(),year:integer('year').notNull(),region:text('region').notNull().default(''),province:text('province').notNull(),category:text('category').notNull(),level:text('level').notNull(),sect:text('sect').notNull().default(''),temple:text('temple').notNull().default(''),sent:integer('sent'),absent:integer('absent'),retained:integer('retained'),passed:integer('passed'),failed:integer('failed'),other:integer('other'),note:text('note').notNull().default(''),sourceFile:text('source_file').notNull(),sourceSheet:text('source_sheet').notNull(),sourceRow:integer('source_row').notNull(),sourceEndRow:integer('source_end_row').notNull(),updatedAt:text('updated_at').notNull()
 },t=>[uniqueIndex('retained_stats_origin').on(t.batchId,t.sourceSheet,t.sourceRow),index('retained_stats_scope').on(t.ownerId,t.year,t.province,t.category,t.level)]);
+
+// Append-only evidence. No application endpoint can update/delete these rows.
+export const auditEvents=sqliteTable('audit_events',{
+ id:integer('id').primaryKey({autoIncrement:true}),kind:text('kind').notNull(),tableName:text('table_name').notNull(),targetId:text('target_id').notNull(),operation:text('operation').notNull(),ownerId:text('owner_id').notNull(),requestId:text('request_id').notNull(),actorId:text('actor_id').notNull(),actorEmail:text('actor_email').notNull(),actorRole:text('actor_role').notNull(),path:text('path').notNull(),method:text('method').notNull(),action:text('action').notNull(),ip:text('ip').notNull(),userAgent:text('user_agent').notNull(),status:integer('status'),beforeJson:text('before_json'),afterJson:text('after_json'),createdAt:text('created_at').notNull()
+},t=>[index('audit_events_owner_id').on(t.ownerId,t.id),index('audit_events_actor_time').on(t.actorEmail,t.createdAt),index('audit_events_target').on(t.tableName,t.targetId,t.id)]);
+export const auditContextTable=sqliteTable('audit_context',{
+ id:integer('id').primaryKey(),requestId:text('request_id').notNull(),actorId:text('actor_id').notNull(),actorEmail:text('actor_email').notNull(),actorRole:text('actor_role').notNull(),ownerId:text('owner_id').notNull(),path:text('path').notNull(),method:text('method').notNull(),action:text('action').notNull(),ip:text('ip').notNull(),userAgent:text('user_agent').notNull()
+});
+export const staffAccess=sqliteTable('staff_access',{
+ email:text('email').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),active:integer('active').notNull().default(1),reason:text('reason').notNull(),grantedBy:text('granted_by').notNull(),updatedAt:text('updated_at').notNull()
+},t=>[index('staff_access_owner').on(t.ownerId,t.active)]);

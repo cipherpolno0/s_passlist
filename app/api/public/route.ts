@@ -1,8 +1,9 @@
+import {withAuditRoute} from '../../../lib/audit-request';
+import {auditDatabase,canManageData,dataOwnerId} from '../../../lib/audit-context';
 import {pagination} from '../../../lib/pagination';
 import {certificateNumber} from '../../../lib/certificate-number';
 import {toArabic} from '../../../lib/thai-numerals';
 import { getChatGPTUser } from '../../chatgpt-auth';
-import { isAdminEmail } from '../../../lib/admin';
 import { PROVINCES } from '../../../lib/constants';
 import { database } from '../../../lib/import-service';
 import { activeRecord } from '../../../lib/record-state';
@@ -13,13 +14,13 @@ const json = (data: unknown, status = 200) => Response.json(data, {status, heade
 const fields = "CASE WHEN r.category='นักธรรม' AND r.title NOT LIKE '%สามเณร%' AND r.title NOT LIKE 'เณร%' THEN r.vassa ELSE NULL END AS vassa,r.sequence AS certificate_sequence,r.birth_year,r.age_at_exam,r.birth_year_estimated,r.age_estimated,r.id,r.year,r.sect,r.region,r.province,r.category,r.level,r.title,r.first_name,r.last_name,r.dharma_name,r.temple,r.district,r.subdistrict,r.school,r.jurisdiction,r.school_kind";
 const provinceOrder = 'CASE r.province ' + PROVINCES.map((province, index) => `WHEN '${province}' THEN ${index}`).join(' ') + ' ELSE 77 END';
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
  try {
   const url = new URL(req.url);
   const action = url.searchParams.get('action') || 'search';
   if (action === 'meta') {
    const user = await getChatGPTUser();
-   return json({viewer: {signedIn: !!user, isAdmin: !!user && isAdminEmail(user.email)}});
+   return json({viewer: {signedIn: !!user, isAdmin: !!user && canManageData(user)}});
   }
   if (action === 'stats' || action === 'groups' || action === 'export') {
    return json({error: 'หน้าสืบค้นทั่วไปไม่เปิดรายการรวม กรุณาค้นด้วยชื่อและนามสกุล'}, 403);
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
 
   const db = database();
   const arabic=(column:string)=>[...'๐๑๒๓๔๕๖๗๘๙'].reduce((sql,digit,index)=>`REPLACE(${sql},'${digit}','${index}')`,column);
-  const sequenceOrder=`CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,sequence_number(${arabic('r.sequence')})`;
+  const sequenceOrder=`CASE WHEN TRIM(COALESCE(r.sequence,''))='' THEN 1 ELSE 0 END,CAST(${arabic('r.sequence')} AS REAL)`;
   const order = `${provinceOrder},CASE r.category WHEN 'นักธรรม' THEN 0 ELSE 1 END,CASE r.level WHEN 'ตรี' THEN 1 WHEN 'โท' THEN 2 ELSE 3 END,r.year DESC,${sequenceOrder} ASC,CASE r.sect WHEN 'มหานิกาย' THEN 0 WHEN 'ธรรมยุต' THEN 1 ELSE 2 END,r.id`;
   const from = `FROM records r JOIN batches b ON b.id=r.batch_id WHERE b.status='committed' AND b.visibility='published' AND ${activeRecord('r')} AND (LOWER(TRIM(${arabic("r.first_name")}))LIKE LOWER(?) ESCAPE '\\' OR LOWER(TRIM(${arabic("COALESCE(r.title,'')||r.first_name")}))LIKE LOWER(?) ESCAPE '\\' OR LOWER(TRIM(${arabic("COALESCE(r.title,'')||' '||r.first_name")}))LIKE LOWER(?) ESCAPE '\\') AND LOWER(TRIM(${arabic("r.last_name")}))LIKE LOWER(?) ESCAPE '\\'`;
   // Both name fields remain mandatory. Escape LIKE syntax so literal one-letter and partial-name searches cannot turn into wildcard browsing.
@@ -54,3 +55,5 @@ export async function GET(req: Request) {
   return json({error: 'ไม่สามารถสืบค้นได้ในขณะนี้ กรุณาลองใหม่'}, 500);
  }
 }
+
+export const GET=withAuditRoute(handleGET);
