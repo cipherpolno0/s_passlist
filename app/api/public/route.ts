@@ -1,8 +1,8 @@
+import {auditDatabase,canManageData,dataOwnerId} from '../../../lib/audit-context';
 import {pagination} from '../../../lib/pagination';
 import {certificateNumber} from '../../../lib/certificate-number';
 import {toArabic} from '../../../lib/thai-numerals';
 import { getChatGPTUser } from '../../chatgpt-auth';
-import { isAdminEmail } from '../../../lib/admin';
 import { PROVINCES } from '../../../lib/constants';
 import { database } from '../../../lib/import-service';
 import { activeRecord } from '../../../lib/record-state';
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   const action = url.searchParams.get('action') || 'search';
   if (action === 'meta') {
    const user = await getChatGPTUser();
-   return json({viewer: {signedIn: !!user, isAdmin: !!user && isAdminEmail(user.email)}});
+   return json({viewer: {signedIn: !!user, isAdmin: !!user && canManageData(user)}});
   }
   if (action === 'stats' || action === 'groups' || action === 'export') {
    return json({error: 'หน้าสืบค้นทั่วไปไม่เปิดรายการรวม กรุณาค้นด้วยชื่อและนามสกุล'}, 403);

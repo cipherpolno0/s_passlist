@@ -5,7 +5,7 @@ const {studyCenterLabel}=require('../.sites-runtime/results-test/lib/result-disp
 const base={id:'1',sequence:'1',title:'พระ',first_name:'ทดสอบ',last_name:'ระบบ',dharma_name:'',category:'นักธรรม',level:'ตรี',sect:'มหานิกาย',region:'ภาค 5',province:'พิษณุโลก',school:'วัดสำนักสอบเดิม',temple:'วัดสังกัดจริง',district:'เมืองพิษณุโลก',jurisdiction:'ส่วนภูมิภาค',year:2542,birth_year:2502,birth_year_estimated:1,age_at_exam:40,age_estimated:0,vassa:12};
 const render=(rows,admin=false)=>renderToStaticMarkup(React.createElement(Table,{rows,onDetail:()=>{},...(admin?{onEdit:()=>{},onTrash:()=>{}}:{})}));
 const headers=html=>[...html.matchAll(/<th scope="col">([\s\S]*?)<\/th>/g)].map(m=>m[1].replace(/<[^>]+>/g,''));
-const expectedMonastic=['ปีการศึกษา','นิกาย','ภาค','ชั้น','เลขที่ ปกศ.','คำนำหน้า','ชื่อ','ฉายา','นามสกุล','อายุ','พรรษา','สังกัดวัด','อำเภอ','จังหวัด','จัดการรายชื่อ'];
+const expectedMonastic=['ปีการศึกษา','นิกาย','ภาค','ชั้น','เลขที่ปกศ.','คำนำหน้า','ชื่อ','ฉายา','นามสกุล','อายุ','พรรษา','สังกัดวัด','อำเภอ','จังหวัด','จัดการรายชื่อ'];
 const expectedLay=expectedMonastic.filter(label=>!['ฉายา','พรรษา'].includes(label));
 test('public and admin monastic results use the requested column order and separate name fields',()=>{
  for(const admin of [false,true]){
@@ -32,7 +32,7 @@ test('central schools keep their named temple/council and do not become a guesse
 });
 
 test('certificate uses the source sequence and all visible digits are Thai without changing control values',()=>{
- const html=render([base]);assert.ok(html.includes('เลขที่ ปกศ.'));assert.ok(html.includes('พล ๑/๒๕๔๒'));assert.ok(!/[0-9]/.test(html.replace(/<[^>]+>/g,'')));
+ const html=render([base]);assert.ok(html.includes('เลขที่ปกศ.'));assert.ok(html.includes('พล ๑/๒๕๔๒'));assert.ok(!/[0-9]/.test(html.replace(/<[^>]+>/g,'')));
  const ThaiNumerals=require('../.sites-runtime/results-test/app/components/ThaiNumerals.js').default;
  const controls=renderToStaticMarkup(React.createElement(ThaiNumerals,null,React.createElement('input',{type:'text',value:'2542',onChange:()=>{},placeholder:'ปี 2542'}),React.createElement('select',{value:'2542',onChange:()=>{}},React.createElement('option',{value:'2542'},'2542'))));
  assert.ok(controls.includes('value="๒๕๔๒"'));assert.ok(controls.includes('value="2542"'));assert.ok(controls.includes('>๒๕๔๒</option>'));
@@ -91,7 +91,7 @@ test('pagination accepts only the three allowed sizes and clamps pages after siz
 test('both categories and audiences omit region and certificate prefixes, including older computed certificates',()=>{
  for(const category of ['นักธรรม','ธรรมศึกษา'])for(const admin of [false,true]){
   const html=render([{...base,category,region:'ภาค 5-6',certificate_number:'ที่ ตก 1/2542'}],admin);
-  assert.ok(html.includes('data-label="ภาค">๕-๖</td>'));assert.ok(html.includes('data-label="เลขที่ ปกศ.">ตก ๑/๒๕๔๒</td>'));
+  assert.ok(html.includes('data-label="ภาค">๕-๖</td>'));assert.ok(html.includes('data-label="เลขที่ปกศ.">ตก ๑/๒๕๔๒</td>'));
   const central=render([{...base,category,region:'',jurisdiction:'ส่วนกลาง'}],admin);assert.ok(central.includes('data-label="ภาค">ส่วนกลาง</td>'));
  }
 });

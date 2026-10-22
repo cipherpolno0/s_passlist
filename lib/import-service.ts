@@ -1,3 +1,4 @@
+import {auditDatabase} from './audit-context';
 import {applyProvinceRegion} from './province-regions';
 import { env } from 'cloudflare:workers';
 import { publicationErrors,databaseRecord,deferSectRecord } from './classification';
@@ -5,7 +6,7 @@ import {fingerprint} from './scope';
 import {SECTS,type ParsedFile} from './constants';
 import {checkOrganizationRecords} from './organization-registry-check';
 import {ORGANIZATION_VERSION} from './organization-registry';
-export function database(){if(!env.DB)throw new Error('ฐานข้อมูลไม่พร้อม');return env.DB;}
+export function database(){if(!env.DB)throw new Error('ฐานข้อมูลไม่พร้อม');return auditDatabase();}
 export function event(owner:string,action:string,target:string,detail:unknown){return database().prepare('INSERT INTO audit(id,owner_id,action,target_id,detail,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),owner,action,target,JSON.stringify(detail),new Date().toISOString());}
 export async function ownedBatch(id:string,owner:string){const b=await database().prepare('SELECT * FROM batches WHERE id=? AND owner_id=?').bind(id,owner).first();if(!b)throw new Error('ไม่พบชุดข้อมูล');return b;}
 export async function commitImport(id:string,owner:string,options:{publish:boolean;automatic:boolean;excludeErrors:boolean;parsed?:ParsedFile;deferSect?:boolean}){

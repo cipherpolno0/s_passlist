@@ -1,3 +1,5 @@
+import {auditedRequest} from '../lib/audit-request';
+import {createAuditDatabase,systemContext} from '../lib/audit-context';
 import {backfillRetainedStatistics} from '../lib/statistics-source-service';
 import {backfillProvinceRegions} from '../lib/province-region-backfill';
 import {backfillVassa} from '../lib/vassa-backfill';
@@ -28,12 +30,12 @@ export default {
         },
       };
     }
-    const response=await runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
-    if(env.DB)ctx.waitUntil(bootstrapOrganizationRegistry(env.DB).catch(error=>console.error('Organization registry bootstrap',error)));
-    if(env.DB&&env.BUCKET)ctx.waitUntil(backfillExamAges(env.DB,env.BUCKET).catch(error=>console.error('Exam age backfill',error)));
-    if(env.DB&&env.BUCKET)ctx.waitUntil(backfillVassa(env.DB,env.BUCKET).catch(error=>console.error('Vassa backfill',error)));
-    if(env.DB&&env.BUCKET)ctx.waitUntil(backfillRetainedStatistics(env.DB,env.BUCKET,{background:true}).catch(error=>console.error('Retained statistics backfill',error)));
-    if(env.DB)ctx.waitUntil(backfillProvinceRegions(env.DB).catch(error=>console.error('Province region backfill',error)));
+    const response=await auditedRequest(request, env, () => runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx)));
+    if(env.DB)ctx.waitUntil(bootstrapOrganizationRegistry(createAuditDatabase(env.DB,systemContext('organization-registry-bootstrap'))).catch(error=>console.error('Organization registry bootstrap',error)));
+    if(env.DB&&env.BUCKET)ctx.waitUntil(backfillExamAges(createAuditDatabase(env.DB,systemContext('exam-age-backfill')),env.BUCKET).catch(error=>console.error('Exam age backfill',error)));
+    if(env.DB&&env.BUCKET)ctx.waitUntil(backfillVassa(createAuditDatabase(env.DB,systemContext('vassa-backfill')),env.BUCKET).catch(error=>console.error('Vassa backfill',error)));
+    if(env.DB&&env.BUCKET)ctx.waitUntil(backfillRetainedStatistics(createAuditDatabase(env.DB,systemContext('statistics-backfill')),env.BUCKET,{background:true}).catch(error=>console.error('Retained statistics backfill',error)));
+    if(env.DB)ctx.waitUntil(backfillProvinceRegions(createAuditDatabase(env.DB,systemContext('province-region-backfill'))).catch(error=>console.error('Province region backfill',error)));
     return response;
   },
 };

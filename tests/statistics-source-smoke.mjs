@@ -40,25 +40,5 @@ try{
  await db.prepare("INSERT INTO exam_statistics(id,owner_id,year,region,province,category,level,sect,temple,sent,passed,source_file,source_sheet,source_row,created_at,updated_at) VALUES('manual','owner',2542,'ภาค 5','พิษณุโลก','นักธรรม','ตรี','','',250,240,'confirmed.xlsx','stats',2,'test','test')").run();assert.equal((await json('year=2542')).totals.sent,250);
  // Missing source file is explicit and does not fabricate statistics.
  await db.prepare("INSERT INTO batches(id,owner_id,province,year,filename,hash,status,total,valid,issues,summary,created_at,age_status,vassa_status) VALUES('lost','owner','ตาก',2542,'lost.xlsx','lost','committed',0,0,0,'{}','test','done','done')").run();await json('',{action:'scan-existing'});const status=await json('action=sources');assert.equal(status.sources.find(s=>s.id==='lost').status,'error');assert.match(status.sources.find(s=>s.id==='lost').error,/ไม่พบไฟล์/);
- // Counts used for red pass-total warnings must stay within the exact result scope.
- async function countRecord(id,overrides={}){
-  const record={id,batch_id:'original',owner_id:'owner',province:'พิษณุโลก',year:2550,category:'นักธรรม',level:'ตรี',title:'พระ',first_name:'TEST_'+id,last_name:'ทดสอบ',dharma_name:'',temple:'วัดทดสอบ',district:'',source_province:'',school:'',note:'',sheet:'TEST',source_row:1,sequence:id,fingerprint:id,sect:'มหานิกาย',region:'ภาค 5',...overrides};
-  await db.prepare(`INSERT INTO records (${Object.keys(record).join(',')}) VALUES (${Object.keys(record).map(()=>'?').join(',')})`).bind(...Object.values(record)).run();
- }
- async function countStat(id,category,level,sect='',temple=''){
-  await db.prepare("INSERT INTO exam_statistics(id,owner_id,year,region,province,category,level,sect,temple,sent,passed,source_file,source_sheet,source_row,created_at,updated_at) VALUES(?,'owner',2550,'ภาค 5','พิษณุโลก',?,?,?,?,10,2,'TEST_counts.xlsx','TEST',1,'test','test')").bind(id,category,level,sect,temple).run();
- }
- for(const category of ['นักธรรม','ธรรมศึกษา'])for(const level of ['ตรี','โท','เอก']){
-  const id=category+level;await countStat(id,category,level);
-  await countRecord(id+'-m',{category,level});await countRecord(id+'-d',{category,level,sect:'ธรรมยุต',temple:'วัดอื่น'});
- }
- await countRecord('wrong-year',{year:2549});await countRecord('wrong-province',{province:'ตาก'});
- await countRecord('wrong-owner',{owner_id:'other'});await countRecord('trashed');
- await db.prepare("INSERT INTO audit(id,owner_id,action,target_id,detail,created_at) VALUES('trash-count','owner','trash-record','trashed','{}','test')").run();
- await retained('draft-count',[]);await db.prepare("UPDATE batches SET status='draft' WHERE id='draft-count'").run();await countRecord('draft-record',{batch_id:'draft-count'});
- const allCounts=(await json('year=2550')).items;assert.equal(allCounts.length,6);for(const item of allCounts){assert.equal(item.passed,2);assert.equal(item.passed_list_count,2);}
- await countStat('sect-count','นักธรรม','ตรี','มหานิกาย');let scoped=(await json('year=2550&category=นักธรรม&level=ตรี&sect=มหานิกาย')).items[0];assert.equal(scoped.passed_list_count,1);assert.notEqual(scoped.passed,scoped.passed_list_count);
- await countStat('temple-count','นักธรรม','ตรี','มหานิกาย','วัดทดสอบ');scoped=(await json('year=2550&temple=วัดทดสอบ&sect=มหานิกาย')).items[0];assert.equal(scoped.passed_list_count,1);
- await countRecord('school-match',{temple:'วัดนอกขอบเขต',school:'วัดทดสอบ'});scoped=(await json('year=2550&temple=วัดทดสอบ&sect=มหานิกาย')).items[0];assert.equal(scoped.passed_list_count,2);
  console.log('PASS: automatic retained-source extraction, D1/R2 linkage, exact numbers/provenance, deduplication, conflict holds, scope rollups, filters/export, missing metrics, retries, archive/delete lifecycle, manual precedence and authorization.');
 }finally{await mf.dispose();}

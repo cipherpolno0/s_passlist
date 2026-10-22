@@ -1,3 +1,4 @@
+import {auditDatabase,canManageData,dataOwnerId} from '../../../lib/audit-context';
 import {pagination,ADMIN_RECORD_PAGE_SIZES} from '../../../lib/pagination';
 import {applyProvinceRegion} from '../../../lib/province-regions';
 import {certificateNumber} from '../../../lib/certificate-number';
@@ -6,7 +7,6 @@ import {toThai,toArabic} from '../../../lib/thai-numerals';
 import {findCentralSchool,centralKey} from '../../../lib/central-schools';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '../../chatgpt-auth';
-import {isAdminEmail} from '../../../lib/admin';
 import {commitImport,publishBatch} from '../../../lib/import-service';
 import {publicationErrors,databaseRecord,deferSectRecord} from '../../../lib/classification';
 import { MAX_FILE, PROVINCES, CATEGORIES, LEVELS, SECTS, type ParsedFile, type PassRecord, type ImportOptions } from '../../../lib/constants';
@@ -18,7 +18,7 @@ import {ORGANIZATION_VERSION} from '../../../lib/organization-registry';
 import {activeRecord,trashedRecord} from '../../../lib/record-state';
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
-const db=()=>{if(!env.DB)throw new Error('ยังไม่พร้อมใช้งานฐานข้อมูล');return env.DB;};
+const db=()=>{if(!env.DB)throw new Error('ยังไม่พร้อมใช้งานฐานข้อมูล');return auditDatabase();};
 const bucket=()=>{if(!env.BUCKET)throw new Error('ยังไม่พร้อมจัดเก็บไฟล์');return env.BUCKET;};
 const now=()=>new Date().toISOString();
 const audit=(owner:string,action:string,target:string,detail:unknown)=>db().prepare('INSERT INTO audit(id,owner_id,action,target_id,detail,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),owner,action,target,JSON.stringify(detail),now());
@@ -30,7 +30,7 @@ function filters(url:URL,owner:string){const w=['r.owner_id=?',"b.status='commit
 const csv=(rows:unknown[][])=>'\ufeff'+rows.map(row=>row.map(v=>{let s=toThai(v??'');if(/^[\s]*[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(',')).join('\r\n');
 const download=(body:BodyInit,name:string,type:string)=>new Response(body,{headers:{'Content-Type':type,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 export async function GET(req:Request){try{
- const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);const owner=user.userId,url=new URL(req.url),action=url.searchParams.get('action')||'search';
+ const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!canManageData(user))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);const owner=dataOwnerId(user),url=new URL(req.url),action=url.searchParams.get('action')||'search';
  if(action==='template')return download((thaiWorkbookCopy(new Uint8Array(await createTemplate()))).buffer as ArrayBuffer,'passlist-template.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
  if(action==='stats'){
  const stat=await db().prepare(`SELECT COUNT(*) total,COUNT(DISTINCT r.province) provinces,COUNT(DISTINCT r.year) years,SUM(CASE WHEN category='นักธรรม' THEN 1 ELSE 0 END) monastic,SUM(CASE WHEN category='ธรรมศึกษา' THEN 1 ELSE 0 END) lay,COUNT(DISTINCT NULLIF(r.region,'')) regions,SUM(CASE WHEN sect='มหานิกาย' THEN 1 ELSE 0 END) maha,SUM(CASE WHEN sect='ธรรมยุต' THEN 1 ELSE 0 END) dhammayut,SUM(CASE WHEN sect='' THEN 1 ELSE 0 END) unknown_sect FROM records r JOIN batches b ON b.id=r.batch_id WHERE r.owner_id=? AND b.status='committed' AND ${activeRecord('r')}`).bind(owner).first();
@@ -87,9 +87,9 @@ export async function GET(req:Request){try{
  }catch(e){console.error(e);return json({error:e instanceof Error?e.message:'เกิดข้อผิดพลาด กรุณาลองใหม่'},400);}}
 export async function POST(req:Request){try{
  // The hosting layer authenticates these headers. Every query also enforces ownership.
- const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!isAdminEmail(user.email))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);
+ const user=await getChatGPTUser();if(!user)return json({error:'กรุณาเข้าสู่ระบบ'},401);if(!canManageData(user))return json({error:'เฉพาะผู้ดูแลระบบเท่านั้น'},403);
  const origin=req.headers.get('origin');if(origin&&origin!==new URL(req.url).origin)return json({error:'ไม่อนุญาตคำขอจากเว็บไซต์อื่น'},403);
- const owner=user.userId;
+ const owner=dataOwnerId(user);
  if(req.headers.get('content-type')?.includes('multipart/form-data')){
  if(Number(req.headers.get('content-length'))>MAX_FILE+65536)throw new Error('ไฟล์ใหญ่เกิน 10 MB');
  const form=await req.formData(),f=form.get('file');if(!(f instanceof File)||!f.name.toLowerCase().endsWith('.xlsx'))throw new Error('รองรับ .xlsx เท่านั้น กรุณาบันทึก .xls เป็น .xlsx ก่อน');
