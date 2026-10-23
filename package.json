@@ -13,7 +13,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-transform-types --test tests/postgres-adapter.test.mjs tests/migration.test.mjs tests/runtime.test.mjs tests/api-availability.test.mjs && node scripts/test-importer.mjs && node scripts/test-results-display.mjs && node scripts/test-retained-statistics.mjs"
+    "test:recovery:http": "node tests/password-recovery-http.mjs",
+    "test": "node --experimental-transform-types --test tests/postgres-adapter.test.mjs tests/migration.test.mjs tests/runtime.test.mjs tests/api-availability.test.mjs tests/password-recovery.test.mjs && node scripts/test-importer.mjs && node scripts/test-results-display.mjs && node scripts/test-retained-statistics.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
