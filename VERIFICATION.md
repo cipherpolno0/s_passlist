@@ -13,3 +13,11 @@
 ไม่ได้ทดสอบใน browser เนื่องจากไม่มี browser QA ที่รองรับในสภาพแวดล้อมนี้ ไม่ได้แก้หรือย้ายข้อมูลจริง ไม่ได้ deploy Vercel และไม่ได้รัน PostgreSQL migration บน Supabase
 
 ไฟล์โค้ดแอปในชุดนี้ตรงกับต้นทาง; การเปลี่ยนเพิ่มเติมอยู่ใน README, DEPLOYMENT.md, VERIFICATION.md และชุดทดสอบสองไฟล์ เว็บ Sites ที่เผยแพร่อยู่ยังเป็นเวอร์ชัน 38
+
+## ตรวจชุด Next.js/PostgreSQL ต่อ 21 ตุลาคม 2569
+
+- `pnpm test`: ผ่าน 73 รายการ รวมการ rollback importer เมื่อปลายทางไม่ว่าง/ข้อมูลต้นทางเปลี่ยน/ไฟล์ปลายทางไม่ตรง SHA-256
+- `pnpm typecheck`: ผ่าน
+- `pnpm build`: ผ่าน Next.js 16.3.4 สร้าง `.next/routes-manifest.json` แล้ว
+- 33 application SQL statements: ตรวจ PREPARE และอ่านข้อมูลสมมติบน Supabase จริงด้วย transaction ที่ ROLLBACK ผ่าน
+- ไม่ได้ทดสอบ credentials, login จริง, migration ข้อมูลจริง, browser หรือ Vercel deployment ของชุดนี้ เพราะขั้นตอน credentials/export ที่เคยถูกปฏิเสธยังต้องได้รับการอนุญาต

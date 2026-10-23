@@ -1,8 +1,9 @@
+import {withAuditRoute} from '../../../lib/audit-request';
+import {auditDatabase,canManageData,dataOwnerId} from '../../../lib/audit-context';
 import {pagination} from '../../../lib/pagination';
 import {certificateNumber} from '../../../lib/certificate-number';
 import {toArabic} from '../../../lib/thai-numerals';
 import { getChatGPTUser } from '../../chatgpt-auth';
-import { isAdminEmail } from '../../../lib/admin';
 import { PROVINCES } from '../../../lib/constants';
 import { database } from '../../../lib/import-service';
 import { activeRecord } from '../../../lib/record-state';
@@ -13,13 +14,13 @@ const json = (data: unknown, status = 200) => Response.json(data, {status, heade
 const fields = "CASE WHEN r.category='นักธรรม' AND r.title NOT LIKE '%สามเณร%' AND r.title NOT LIKE 'เณร%' THEN r.vassa ELSE NULL END AS vassa,r.sequence AS certificate_sequence,r.birth_year,r.age_at_exam,r.birth_year_estimated,r.age_estimated,r.id,r.year,r.sect,r.region,r.province,r.category,r.level,r.title,r.first_name,r.last_name,r.dharma_name,r.temple,r.district,r.subdistrict,r.school,r.jurisdiction,r.school_kind";
 const provinceOrder = 'CASE r.province ' + PROVINCES.map((province, index) => `WHEN '${province}' THEN ${index}`).join(' ') + ' ELSE 77 END';
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
  try {
   const url = new URL(req.url);
   const action = url.searchParams.get('action') || 'search';
   if (action === 'meta') {
    const user = await getChatGPTUser();
-   return json({viewer: {signedIn: !!user, isAdmin: !!user && isAdminEmail(user.email)}});
+   return json({viewer: {signedIn: !!user, isAdmin: !!user && canManageData(user)}});
   }
   if (action === 'stats' || action === 'groups' || action === 'export') {
    return json({error: 'หน้าสืบค้นทั่วไปไม่เปิดรายการรวม กรุณาค้นด้วยชื่อและนามสกุล'}, 403);
@@ -54,3 +55,5 @@ export async function GET(req: Request) {
   return json({error: 'ไม่สามารถสืบค้นได้ในขณะนี้ กรุณาลองใหม่'}, 500);
  }
 }
+
+export const GET=withAuditRoute(handleGET);

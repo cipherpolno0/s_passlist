@@ -56,3 +56,6 @@ next-env.d.ts
 /work/
 
 *.tsbuildinfo
+
+# Commit only the non-secret configuration template
+!.env.example

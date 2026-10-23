@@ -1,5 +1,5 @@
 import { gunzipSync, strFromU8 } from 'fflate';
-import bundledSeed from '../data/temple-registry-v1.txt?raw';
+import bundledSeed from '../data/temple-registry-v1.seed.json';
 import { normalizeProvince } from './scope';
 
 export const TEMPLE_REGISTRY_VERSION='report-temple-2026-10-20-v1';
