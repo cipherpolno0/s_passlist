@@ -3,6 +3,7 @@ import {withAuditContext} from '../../../lib/audit-context';
 import {database} from '../../../lib/postgres';
 import {supabaseServer} from '../../../lib/supabase-server';
 import {isAdminEmail} from '../../../lib/admin';
+export function GET(request:Request){return Response.redirect(new URL('/login',request.url),303);}
 export async function POST(request:Request){
  if(request.headers.get('origin')!==new URL(request.url).origin)return new Response('Forbidden',{status:403});
  const form=await request.formData(),email=String(form.get('email')||'').trim(),password=String(form.get('password')||'');

@@ -23,7 +23,7 @@
 1. ตรวจว่า schema ตรง `supabase/schema.sql` ที่ติดตั้งไว้แล้ว ห้ามรันไฟล์นี้ซ้ำบนปลายทางที่มี schema เพราะใช้ CREATE TABLE/FUNCTION
 2. สร้าง role ตาม `supabase/app-role.sql` ผ่าน psql protected stdin โดยส่ง `app_password` เป็นรหัสสุ่ม ไม่บันทึกรหัสใน repository หรือประวัติ SQL สาธารณะ สคริปต์ role ทำใน transaction และหยุดเมื่อ role มีอยู่แล้ว
 3. ตั้ง env ใน Vercel production: DATABASE_URL ของ transaction pooler (port 6543, username `passlist_app.<project-ref>`), NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, ADMIN_EMAILS และ DATA_OWNER_ID ซึ่งตรงเจ้าของข้อมูล Sites เดิม ห้ามใช้ project postgres/service-role เป็น runtime credential
-4. สร้างบัญชี Supabase Auth ของอีเมลผู้ดูแลที่อนุญาตและยืนยันอีเมล ตั้ง Site URL ให้ตรงโดเมนจริง หน้า /login มีการสร้างบัญชีเฉพาะ allowlist; ยังไม่มี flow ลืมรหัสผ่านในชุดนี้
+4. สร้างบัญชี Supabase Auth ของอีเมลผู้ดูแลที่อนุญาตและยืนยันอีเมล ตั้ง Site URL ให้ตรงโดเมนจริง หน้า /login มีการสร้างบัญชีเฉพาะ allowlist และมีลิงก์ลืมรหัสผ่านตามวิธีด้านล่าง
 5. ตั้ง Vercel Framework เป็น Next.js, Build Command `pnpm build`, Install Command `pnpm install --frozen-lockfile`, ไม่กำหนด Output Directory เป็น dist และใช้ Node.js 24
 6. เก็บ DATABASE_URL เฉพาะ encrypted/sensitive environment ฝั่งเซิร์ฟเวอร์ ไม่ส่งรหัสฐานข้อมูลไป NEXT_PUBLIC_ และไม่ใส่ credentials ของ production ให้ preview ที่ยังไม่ตรวจโค้ด
 
@@ -39,6 +39,21 @@
 6. ตรวจ public search, ตัวกรองทั้ง 6 ชั้น, สถิติสีแดงเมื่อไม่ตรงรายชื่อ, login/logout, การปฏิเสธผู้ไม่มีสิทธิ์, import/export, ถังขยะ/กู้คืนและทะเบียนด้วยข้อมูลจริง ก่อนสลับ production
 
 ห้ามนำไฟล์ Excel รายชื่อ ผลส่งออก database หรือ secrets ขึ้น GitHub ข้อมูลอ้างอิงวัด/สถานศึกษาที่ได้รับอนุญาตไว้แล้วเป็นคนละชุดกับรายชื่อผู้สอบได้
+
+## ลืมรหัสผ่านและตั้งรหัสใหม่
+
+1. Supabase → Authentication → URL Configuration: ตั้ง Site URL เป็น `https://newspasslist.vercel.app` และเพิ่ม Redirect URL แบบตรงตัว `https://newspasslist.vercel.app/auth/callback` สำหรับ local ใช้ `http://localhost:3000/auth/callback` เฉพาะเมื่อต้องทดสอบ local
+2. ตั้ง SMTP ด้วย sender email, username และรหัส SMTP ที่ถูกต้อง หากใช้ Gmail ให้ใช้ App password ของ Google ในช่อง SMTP Password; รหัสนี้ใช้ส่งเมล ไม่ใช่รหัสผ่านของบัญชีผู้ใช้เว็บ
+3. ใช้ Reset Password email template ที่มีลิงก์ `{{ .ConfirmationURL }}` (ค่าเริ่มต้นของ Supabase) เว็บเรียก `resetPasswordForEmail` แบบ PKCE โดยกำหนด callback ชัดเจน อย่าแทนลิงก์ด้วย Site URL เปล่า
+4. ผู้ใช้เปิด `/login` → **ลืมรหัสผ่าน?** → กรอกอีเมล → เปิดลิงก์จากอีเมลในเบราว์เซอร์และอุปกรณ์เดิม → กรอกรหัสใหม่อย่างน้อย 12 ตัวอักษรสองครั้ง → เข้าระบบด้วยรหัสใหม่ ลิงก์หมดอายุหรือใช้แล้วจะกลับไปหน้าขอลิงก์ใหม่
+
+`/auth/callback` ยังรองรับ TokenHash เฉพาะ `type=recovery` หากดูแล custom template อยู่แล้ว รูปแบบคือ `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery` อย่าใช้ร่วมกับ confirmation/sign-up template ที่เป็น OTP ประเภทอื่น
+
+การขอลิงก์ไม่สร้างบัญชีใหม่ ไม่เพิ่มสิทธิ์ผู้ดูแล และแสดงข้อความเดียวกันสำหรับอีเมลที่ไม่มีบัญชี การเปลี่ยนรหัสใช้ตัวตนจาก `getUser()` ฝั่งเซิร์ฟเวอร์เท่านั้น ไม่มี service-role key ใน browser รหัสผ่านและ token ไม่ถูกบันทึกใน application logs หลังสำเร็จระบบเพิกถอน refresh sessions ผ่าน global sign-out แล้วกลับหน้า login; access tokens เดิมอาจยังใช้ได้จนหมดอายุตามนโยบาย Supabase
+
+Supabase Auth มีประวัติการเปลี่ยนรหัสของตนเอง ส่วน `password-reset` ใน `passlist.audit_events` เป็นบันทึกเสริม หากฐานข้อมูลแอปไม่พร้อมจะไม่ทำให้การเปลี่ยนรหัสที่สำเร็จแล้วกลายเป็นหน้าผิดพลาด การเข้า `/admin` ยังต้องมี `DATABASE_URL`, application role และสิทธิ์ที่ถูกต้อง
+
+ตรวจระบบโดยไม่ส่งอีเมลจริงหรือเปลี่ยนรหัสบัญชีจริงด้วย `node --experimental-transform-types --test tests/password-recovery.test.mjs` และ `pnpm test:recovery:http` คำสั่งหลังรัน Next.js และ Auth จำลองภายในเครื่อง ตรวจ PKCE cookies, callback, แบบฟอร์ม, การเปลี่ยนรหัสและออกจากระบบครบเส้นทาง การส่งอีเมลถึงกล่องจริงและการตั้งรหัสจริงให้เจ้าของบัญชีทำผ่านหน้าฟอร์ม
 
 ## ตรวจซอร์สโดยไม่แก้ข้อมูลจริง
 
