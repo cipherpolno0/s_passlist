@@ -12,7 +12,9 @@ for(const route of ['public','passlist','statistics','sect-review','temple-regis
  await esbuild.build({entryPoints:[`app/api/${route}/route.ts`],outfile,platform:'node',format:'esm',bundle:true,packages:'external',plugins:[{name:'test-runtime',setup(build){
   build.onResolve({filter:/\/runtime$/},()=>({path:'runtime',namespace:'stub'}));
   build.onResolve({filter:/chatgpt-auth$/},()=>({path:'auth',namespace:'stub'}));
-  build.onLoad({filter:/.*/,namespace:'stub'},args=>({contents:args.path==='runtime'?"export const env={DB:globalThis.__passlist_test_db__,ADMIN_EMAILS:'compat@example.test'};":"export async function getChatGPTUser(){return {userId:'compat-owner',email:'compat@example.test',displayName:'Compatibility test'};}"}));
+  build.onResolve({filter:/\/audit-request$/},()=>({path:'audit-request',namespace:'stub'}));
+  build.onResolve({filter:/\/audit-context$/},()=>({path:'audit-context',namespace:'stub'}));
+  build.onLoad({filter:/.*/,namespace:'stub'},args=>({contents:args.path==='runtime'?"export const env={DB:globalThis.__passlist_test_db__,ADMIN_EMAILS:'compat@example.test'};":args.path==='audit-request'?"export const withAuditRoute=handler=>handler;":args.path==='audit-context'?"export const auditDatabase=()=>globalThis.__passlist_test_db__;export const canManageData=()=>true;export const dataOwnerId=()=> 'compat-owner';":"export async function getChatGPTUser(){return {userId:'compat-owner',email:'compat@example.test',displayName:'Compatibility test'};}"}));
  }}]});
  const module=await import(pathToFileURL(process.cwd()+'/'+outfile).href);
  for(const action of route==='passlist'?['search','stats','batches','trash']:['search']){
@@ -21,7 +23,7 @@ for(const route of ['public','passlist','statistics','sect-review','temple-regis
  }
 }
 fixtureBatch={id:'compat-batch',owner_id:'compat-owner',status:'draft',inserted:0,valid:1,visibility:'internal'};
-await esbuild.build({entryPoints:['lib/import-service.ts'],outfile:'.sites-runtime/pg-check/import-service.mjs',platform:'node',format:'esm',bundle:true,packages:'external',plugins:[{name:'test-import-runtime',setup(build){build.onResolve({filter:/\/runtime$/},()=>({path:'runtime',namespace:'stub'}));build.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:"export const env={DB:globalThis.__passlist_test_db__,BUCKET:{async put(){}}};"}));}}]});
+await esbuild.build({entryPoints:['lib/import-service.ts'],outfile:'.sites-runtime/pg-check/import-service.mjs',platform:'node',format:'esm',bundle:true,packages:'external',plugins:[{name:'test-import-runtime',setup(build){build.onResolve({filter:/\/runtime$/},()=>({path:'runtime',namespace:'stub'}));build.onResolve({filter:/\/audit-context$/},()=>({path:'audit-context',namespace:'stub'}));build.onLoad({filter:/.*/,namespace:'stub'},({path})=>({contents:path==='audit-context'?"export const auditDatabase=()=>globalThis.__passlist_test_db__;":"export const env={DB:globalThis.__passlist_test_db__,BUCKET:{async put(){}}};"}));}}]});
 const service=await import(pathToFileURL(process.cwd()+'/.sites-runtime/pg-check/import-service.mjs').href);
 const version=JSON.parse(fs.readFileSync('data/organization-registry-v1.manifest.json','utf8')).version;
 await service.commitImport('compat-batch','compat-owner',{publish:false,automatic:false,excludeErrors:false,parsed:{organizationSummary:{ready:true,version},records:[{id:'fixture',sheet:'ทดสอบ',row:1,sequence:'1',title:'',firstName:'ทดสอบ',lastName:'ระบบ',dharmaName:'',category:'ธรรมศึกษา',level:'ตรี',province:'ตาก',year:2542,region:'ภาค 5',sect:'',jurisdiction:'ส่วนภูมิภาค',schoolKind:'',temple:'โรงเรียนทดสอบ',district:'',subdistrict:'',sourceProvince:'ตาก',school:'คณะจังหวัดตาก',note:'',fingerprint:'fixture',errors:[],warnings:[]}]} });

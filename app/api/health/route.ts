@@ -1,3 +1,3 @@
 import {postgres} from '../../../lib/postgres';
 export const dynamic='force-dynamic';
-export async function GET(){try{const result=await postgres().query("SELECT current_user AS database_role,(SELECT count(*) FROM passlist.records) AS records,(SELECT count(*) FROM passlist.batches) AS batches");const url=new URL(process.env.DATABASE_URL!);return Response.json({ok:true,siteVersion:39,databaseHost:url.hostname,databasePort:url.port||'5432',...result.rows[0]},{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({ok:false,error:'Database connection unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});}}
+export async function GET(){try{await postgres().query('SELECT 1 FROM passlist.records LIMIT 1');return Response.json({ok:true,siteVersion:39},{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({ok:false},{status:503,headers:{'Cache-Control':'no-store'}});}}

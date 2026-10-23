@@ -18,7 +18,7 @@ const num = (n: number) => new Intl.NumberFormat('th-TH-u-nu-thai').format(n || 
 
 async function request<T>(params: URLSearchParams, signal?: AbortSignal): Promise<T> {
   const res = await fetch('/api/public?' + params, { signal });
-  const data = await res.json() as { error?: string };
+  const data = await res.json().catch(() => ({error: 'ระบบไม่พร้อมให้บริการในขณะนี้ กรุณาลองใหม่ภายหลัง'})) as { error?: string };
   if (!res.ok) throw new Error(data.error || 'สืบค้นไม่สำเร็จ');
   return data as T;
 }
@@ -151,7 +151,7 @@ export default function PublicSearch() {
 
       <section className="card">
         <div className="result-heading"><div><h2>ผลการสืบค้น{applied && !loading ? <span className="count-badge">{num(data.total)} รายชื่อ</span> : null}</h2><p>{applied ? `ค้นหาชื่อ “${applied.firstName}” นามสกุล “${applied.lastName}”` : 'กรอกชื่อและนามสกุลคู่กันเพื่อดูผลสอบ'}</p></div></div>
-        {loading ? <div className="empty"><Loader2 size={28} className="spin" /><p>กำลังสืบค้น…</p></div> : data.items.length ? <>
+        {loading ? <div className="empty"><Loader2 size={28} className="spin" /><p>กำลังสืบค้น…</p></div> : error ? <div className="empty"><p>ยังไม่สามารถแสดงผลการสืบค้นได้ กรุณาลองใหม่ภายหลัง</p></div> : data.items.length ? <>
           <ExamResultsTable rows={data.items} onDetail={detail}/>
           <div className="pagination"><div className="pagination-summary"><PageSizeSelect value={pageSize} onChange={size=>{setPageSize(size);setPage(1);}} disabled={loading}/><span>แสดง {(data.page-1)*pageSize+1}–{Math.min(data.page*pageSize,data.total)} จาก {num(data.total)} รายชื่อ</span></div><Pagination page={data.page} pages={data.pages} onChange={setPage} disabled={loading}/></div>
         </> : <Empty searched={!!applied} />}

@@ -1,10 +1,10 @@
 import {Pool, types} from 'pg';
 import {context} from './audit-store.mjs';
+import {databaseConfig} from './database-config.mjs';
 types.setTypeParser(20, Number);
 let pool:Pool|undefined;
 export function postgres(){
- if(!process.env.DATABASE_URL)throw new Error('ยังไม่ได้ตั้งค่าฐานข้อมูล');
- return pool??=new Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:true},max:5,idleTimeoutMillis:30000,connectionTimeoutMillis:15000});
+ return pool??=new Pool(databaseConfig(process.env.DATABASE_URL));
 }
 const numeric=new Set('year source_row source_order source_end_row sent absent retained passed failed other birth_year age_at_exam birth_year_estimated age_estimated vassa sect_reviewed lease_until row order birth age birthEstimated ageEstimated'.split(' '));
 export function postgresSql(input:string){
@@ -39,7 +39,7 @@ export const database={
   const client=await postgres().connect();
   try{await client.query('BEGIN');await client.query('SET LOCAL search_path = passlist, pg_catalog');await client.query("SET LOCAL statement_timeout = '120s'");
    const c=context.getStore();await client.query("SELECT set_config('passlist.audit_context',$1,true)",[JSON.stringify(c?{request_id:c.requestId,actor_id:c.actorId,actor_email:c.actorEmail,actor_role:c.actorRole,owner_id:c.ownerId,path:c.path,method:c.method,action:c.action,ip:c.ip,user_agent:c.userAgent}:{actor_role:'system',action:'background'})]);
-   if(c?.access?.role==='viewer'&&statements.some(s=>/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(s.sql)))throw new Error('บทบาทผู้ดูข้อมูลไม่สามารถเปลี่ยนข้อมูลได้');
+   if(c?.access?.role==='viewer'&&statements.some(s=>/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(s.sql)&&!/^\s*INSERT\s+INTO\s+(?:passlist\.)?audit_events\s*\(/i.test(s.sql)))throw new Error('บทบาทผู้ดูข้อมูลไม่สามารถเปลี่ยนข้อมูลได้');
    const results=[];for(const statement of statements){const r=await client.query(postgresSql(statement.sql),statement.args);results.push({results:r.rows,success:true,meta:{changes:r.rowCount||0}});}
    await client.query('COMMIT');return results;
   }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
